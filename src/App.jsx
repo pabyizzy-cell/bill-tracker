@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import AuthPanel from './components/AuthPanel.jsx';
 import CategoryDonut from './components/CategoryDonut.jsx';
+import CsvImportBanner from './components/CsvImportBanner.jsx';
 import MonthPicker from './components/MonthPicker.jsx';
 import SharingPanel from './components/SharingPanel.jsx';
 import SummaryCards from './components/SummaryCards.jsx';
@@ -12,6 +13,7 @@ import { generateSampleData } from './data/sampleData.js';
 import { useAuth } from './hooks/useAuth.js';
 import { useShares } from './hooks/useShares.js';
 import { useTransactions } from './hooks/useTransactions.js';
+import { mapBankCsv } from './lib/bankImport.js';
 import { currentMonthKey, lastNMonths, monthKeyOf } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
 
@@ -60,8 +62,12 @@ export default function App() {
   const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
   const [editingId, setEditingId] = useState(null);
+  const [pendingCsv, setPendingCsv] = useState(null);
+  const [csvBusy, setCsvBusy] = useState(false);
+  const [importNotice, setImportNotice] = useState('');
   const formRef = useRef(null);
   const importRef = useRef(null);
+  const csvRef = useRef(null);
 
   const ownData = !store.cloudMode || !context || context.role === 'owner';
   const readOnly = store.cloudMode && !store.canWrite;
@@ -234,6 +240,52 @@ export default function App() {
     reader.readAsText(file);
   }
 
+  function importCsvFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const result = mapBankCsv(reader.result);
+        const existing = new Set(transactions.map(txKey));
+        const toAdd = [];
+        let duplicates = 0;
+        for (const t of result.transactions) {
+          if (existing.has(txKey(t))) duplicates++;
+          else toAdd.push(t);
+        }
+        if (toAdd.length === 0) {
+          window.alert(
+            duplicates > 0
+              ? `Nothing new to import — all ${duplicates} transactions are already in this data.`
+              : 'No importable transactions found in that file.',
+          );
+          return;
+        }
+        setImportNotice('');
+        setPendingCsv({ ...result, toAdd, duplicates });
+      } catch (err) {
+        window.alert(`Couldn't read that file: ${err.message}`);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  async function confirmCsvImport() {
+    if (!pendingCsv) return;
+    setCsvBusy(true);
+    const ok = await store.addMany(pendingCsv.toAdd);
+    setCsvBusy(false);
+    if (!ok) return;
+    const latest = pendingCsv.toAdd.reduce((max, t) => (t.date > max ? t.date : max), '');
+    if (latest) setMonth(monthKeyOf(latest));
+    setImportNotice(
+      `Imported ${pendingCsv.toAdd.length} transaction${pendingCsv.toAdd.length === 1 ? '' : 's'} from your bank file.`,
+    );
+    setPendingCsv(null);
+  }
+
   const editingTx = transactions.find((t) => t.id === editingId) ?? null;
   const showImportBanner =
     store.cloudMode && ownData && !store.loading && transactions.length === 0 && store.localCount > 0;
@@ -258,6 +310,16 @@ export default function App() {
           </button>
           {ownData ? (
             <>
+              <button type="button" className="btn ghost" onClick={() => csvRef.current?.click()}>
+                Import bank CSV
+              </button>
+              <input
+                ref={csvRef}
+                type="file"
+                accept=".csv,text/csv"
+                hidden
+                onChange={importCsvFile}
+              />
               <button type="button" className="btn ghost" onClick={() => importRef.current?.click()}>
                 Restore
               </button>
@@ -304,6 +366,24 @@ export default function App() {
           You're viewing <strong>{context.ownerEmail}</strong>'s data
           {readOnly ? ' with view-only access.' : ' with full access.'}
         </div>
+      ) : null}
+
+      {importNotice ? (
+        <div className="alert info">
+          <span>{importNotice}</span>
+          <button type="button" className="btn link" onClick={() => setImportNotice('')}>
+            dismiss
+          </button>
+        </div>
+      ) : null}
+
+      {pendingCsv ? (
+        <CsvImportBanner
+          pending={pendingCsv}
+          busy={csvBusy}
+          onConfirm={confirmCsvImport}
+          onCancel={() => setPendingCsv(null)}
+        />
       ) : null}
 
       {showImportBanner ? (
@@ -365,6 +445,12 @@ export default function App() {
       </footer>
     </div>
   );
+}
+
+// Fingerprint used to skip rows that already exist when re-importing an
+// overlapping bank export.
+function txKey(t) {
+  return [t.date, t.type, t.amountCents, t.description.toLowerCase()].join('|');
 }
 
 function downloadFile(name, type, content) {

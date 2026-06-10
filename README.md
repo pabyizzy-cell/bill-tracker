@@ -17,6 +17,11 @@ charts — no account, no server, no data leaving your browser.
   at a glance. Flip between months with the month picker.
 - **16 built-in categories** with emoji and color coding (housing, groceries,
   dining out, subscriptions, and more).
+- **Import your bank's CSV** — drop in a Chase credit card or checking
+  export (or any CSV with date/description/amount columns) to seed months of
+  real data in seconds. Categories are mapped automatically, card payments
+  are skipped so transfers don't count as income, re-imports skip
+  duplicates, and nothing is saved until you confirm a review screen.
 - **Your data stays yours** — everything lives in your browser's
   localStorage. Use **Backup / Restore** (JSON) to move it between devices,
   or **Export CSV** to open it in a spreadsheet.

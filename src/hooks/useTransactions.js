@@ -124,6 +124,40 @@ export function useTransactions(session, context) {
     [cloudMode, setLocal],
   );
 
+  // Bulk append — used by the bank CSV importer. Unlike replaceAll, this
+  // never deletes anything.
+  const addMany = useCallback(
+    async (list) => {
+      if (list.length === 0) return true;
+      if (!cloudMode) {
+        setLocal((prev) => [
+          ...list.map((t) => ({ ...t, id: crypto.randomUUID() })),
+          ...prev,
+        ]);
+        return true;
+      }
+      setLoading(true);
+      const inserted = [];
+      for (let i = 0; i < list.length; i += INSERT_CHUNK) {
+        const chunk = list.slice(i, i + INSERT_CHUNK).map((t) => ({ ...toRow(t), user_id: ownerId }));
+        const { data, error: insErr } = await supabase.from('transactions').insert(chunk).select();
+        if (insErr) {
+          setLoading(false);
+          setError(`Import stopped partway: ${insErr.message}`);
+          if (inserted.length) {
+            setCloud((prev) => [...inserted.map(fromRow), ...prev].sort(byDateDesc));
+          }
+          return false;
+        }
+        inserted.push(...data);
+      }
+      setCloud((prev) => [...inserted.map(fromRow), ...prev].sort(byDateDesc));
+      setLoading(false);
+      return true;
+    },
+    [cloudMode, ownerId, setLocal],
+  );
+
   // Wholesale replacement — used by Restore, sample data, and Clear ([]).
   // Only ever offered on the user's own dataset.
   const replaceAll = useCallback(
@@ -198,6 +232,7 @@ export function useTransactions(session, context) {
     error,
     dismissError,
     add,
+    addMany,
     update,
     remove,
     replaceAll,
