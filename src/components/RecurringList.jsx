@@ -7,10 +7,19 @@ import { FREQUENCY_LABELS, nextOccurrence, occurrencesBetween } from '../lib/pro
 // The recurring bills/deposits behind the projections. Amount, frequency,
 // and schedule date are editable in place; description/category come from
 // the original transaction (delete and re-mark if those are wrong).
-export default function RecurringList({ items, available, canWrite, onUpdate, onRemove }) {
+export default function RecurringList({
+  items,
+  available,
+  canWrite,
+  onUpdate,
+  onRemove,
+  onBulkRemove,
+}) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState('');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(() => new Set());
 
   if (!available) return null; // ProjectionCard already shows the migration hint.
 
@@ -67,14 +76,72 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
     await onRemove(item.id);
   }
 
+  function toggle(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const allSelected = items.length > 0 && selected.size === items.length;
+
+  async function bulkDelete() {
+    const ids = [...selected];
+    if (
+      !window.confirm(
+        `Stop projecting ${ids.length} selected item${ids.length === 1 ? '' : 's'}? Past transactions are kept.`,
+      )
+    ) {
+      return;
+    }
+    const ok = await onBulkRemove(ids);
+    if (ok) setSelected(new Set());
+  }
+
   return (
     <section className="card">
       <div className="list-header">
         <h2>Recurring bills & deposits</h2>
         <span className="list-count">
           {items.length} {items.length === 1 ? 'item' : 'items'}
+          {canWrite && items.length > 0 ? (
+            <button
+              type="button"
+              className={`btn ghost small ${selectMode ? 'active' : ''}`}
+              onClick={() => {
+                setSelectMode((v) => !v);
+                setSelected(new Set());
+                setEditingId(null);
+              }}
+            >
+              {selectMode ? 'Done selecting' : 'Select'}
+            </button>
+          ) : null}
         </span>
       </div>
+
+      {selectMode && items.length > 0 ? (
+        <div className="bulk-bar">
+          <label className="bulk-check">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() =>
+                setSelected(allSelected ? new Set() : new Set(items.map((r) => r.id)))
+              }
+              aria-label="Select all recurring items"
+            />
+            {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+          </label>
+          {selected.size > 0 ? (
+            <button type="button" className="btn ghost danger" onClick={bulkDelete}>
+              Delete selected
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {upcoming.length > 0 ? (
         <div className="upcoming-strip">
@@ -109,6 +176,14 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
             const editing = editingId === item.id;
             return (
               <li key={item.id} className={editing ? 'editing' : ''}>
+                {selectMode ? (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(item.id)}
+                    onChange={() => toggle(item.id)}
+                    aria-label={`Select recurring ${item.description}`}
+                  />
+                ) : null}
                 <span
                   className="tx-emoji"
                   style={{ background: `${cat.color}22`, borderColor: `${cat.color}55` }}
@@ -154,7 +229,7 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
                   {isIncome ? '+' : '−'}
                   {formatCents(item.amountCents)}
                 </span>
-                {canWrite ? (
+                {canWrite && !selectMode ? (
                   <div className="tx-actions">
                     {editing ? (
                       <>

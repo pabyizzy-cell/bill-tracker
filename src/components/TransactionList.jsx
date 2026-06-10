@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, getCategory } from '../data/categories.js';
 import { formatDate, monthLabel } from '../lib/dates.js';
 import { formatCents } from '../lib/money.js';
+import { FREQUENCY_LABELS } from '../lib/projection.js';
 
 // Shows one month of transactions — or, when a search query is active,
 // matches from every month. Select mode adds checkboxes for bulk delete /
@@ -18,6 +19,7 @@ export default function TransactionList({
   onDelete,
   onBulkDelete,
   onBulkCategory,
+  onBulkRecurring,
   onLoadSample,
   canEdit = true,
 }) {
@@ -55,6 +57,12 @@ export default function TransactionList({
   async function bulkCategory(category) {
     if (!category) return;
     const ok = await onBulkCategory(visibleSelected.map((t) => t.id), category);
+    if (ok) setSelected(new Set());
+  }
+
+  async function bulkRecurring(frequency) {
+    if (!frequency) return;
+    const ok = await onBulkRecurring(visibleSelected.map((t) => t.id), frequency);
     if (ok) setSelected(new Set());
   }
 
@@ -112,9 +120,23 @@ export default function TransactionList({
           </label>
           {visibleSelected.length > 0 ? (
             <>
-              <button type="button" className="btn ghost danger" onClick={bulkDelete}>
-                Delete selected
-              </button>
+              <label className="bulk-apply">
+                mark as repeating
+                <select
+                  value=""
+                  onChange={(e) => bulkRecurring(e.target.value)}
+                  aria-label="Mark selected transactions as repeating"
+                >
+                  <option value="" disabled>
+                    choose…
+                  </option>
+                  {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="bulk-apply">
                 change category to
                 <select
@@ -141,6 +163,9 @@ export default function TransactionList({
                   </optgroup>
                 </select>
               </label>
+              <button type="button" className="btn ghost danger" onClick={bulkDelete}>
+                Delete selected
+              </button>
             </>
           ) : null}
         </div>

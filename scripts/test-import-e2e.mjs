@@ -131,8 +131,8 @@ check(
 await page.locator('.search-input').fill('');
 await page.waitForTimeout(200);
 
-// Bulk select: change category for two rows, then bulk delete them.
-await page.getByRole('button', { name: 'Select', exact: true }).click();
+// Bulk select existing entries: change category, mark as repeating, delete.
+await page.locator('.list-tools').getByRole('button', { name: 'Select' }).click();
 await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
 await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
 await page
@@ -143,17 +143,56 @@ check(
   'bulk category change reports what it did',
   await page.getByText(/Moved 2 transactions to Dining Out/).isVisible(),
 );
+
+// Bulk "mark as repeating" on EXISTING entries.
+await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
+await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
+await page
+  .locator('select[aria-label="Mark selected transactions as repeating"]')
+  .selectOption('monthly');
+await page.waitForTimeout(200);
+check(
+  'bulk mark-as-repeating reports what it did',
+  await page.getByText(/Marked 2 entries as repeating \(every month\)/).isVisible(),
+);
+check(
+  'recurring list gained the two marked entries',
+  (await page.locator('.recurring-list li').count()) === 3,
+);
+
 await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
 await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
 page.once('dialog', (d) => d.accept());
-await page.getByRole('button', { name: 'Delete selected' }).click();
+await page.locator('.bulk-bar').getByRole('button', { name: 'Delete selected' }).click();
 await page.waitForTimeout(300);
 check(
   'bulk delete removes the selected rows',
-  !(await page.getByText('STARBUCKS STORE 123, SEATTLE').isVisible()) &&
+  !(await page.locator('.tx-list').getByText('STARBUCKS STORE 123, SEATTLE').isVisible()) &&
     (await page.locator('.tx-list li').count()) === 1,
 );
+check(
+  'deleting transactions keeps their recurring schedules',
+  (await page.locator('.recurring-list li').count()) === 3,
+);
 await page.getByRole('button', { name: 'Done selecting' }).click();
+
+// Bulk delete in the recurring card prunes schedules.
+const recSection = page.locator('section.card', { hasText: 'Recurring bills & deposits' });
+await recSection.getByRole('button', { name: 'Select', exact: true }).click();
+await page
+  .locator('.recurring-list input[aria-label="Select recurring STARBUCKS STORE 123, SEATTLE"]')
+  .check();
+await page
+  .locator('.recurring-list input[aria-label="Select recurring WHOLEFDS MKT 10259"]')
+  .check();
+page.once('dialog', (d) => d.accept());
+await recSection.getByRole('button', { name: 'Delete selected' }).click();
+await page.waitForTimeout(300);
+check(
+  'recurring bulk delete prunes the list',
+  (await page.locator('.recurring-list li').count()) === 1,
+);
+await recSection.getByRole('button', { name: 'Done selecting' }).click();
 
 // Re-import the same file: everything should be a duplicate.
 page.once('dialog', async (d) => {

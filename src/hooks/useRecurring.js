@@ -121,6 +121,33 @@ export function useRecurring(session, context) {
     [cloudMode, setLocal],
   );
 
+  const removeMany = useCallback(
+    async (ids) => {
+      if (ids.length === 0) return true;
+      if (!cloudMode) {
+        const gone = new Set(ids);
+        setLocal((prev) => prev.filter((r) => !gone.has(r.id)));
+        return true;
+      }
+      for (let i = 0; i < ids.length; i += 100) {
+        const { error: err } = await supabase
+          .from('recurring_items')
+          .delete()
+          .in('id', ids.slice(i, i + 100));
+        if (err) {
+          setError(`Couldn't delete: ${err.message}`);
+          const gone = new Set(ids.slice(0, i));
+          setCloud((prev) => prev.filter((r) => !gone.has(r.id)));
+          return false;
+        }
+      }
+      const gone = new Set(ids);
+      setCloud((prev) => prev.filter((r) => !gone.has(r.id)));
+      return true;
+    },
+    [cloudMode, setLocal],
+  );
+
   // Used by sample data / Clear. Owner-only paths in the app.
   const replaceAll = useCallback(
     async (list) => {
@@ -153,6 +180,7 @@ export function useRecurring(session, context) {
     addMany,
     update,
     remove,
+    removeMany,
     replaceAll,
   };
 }

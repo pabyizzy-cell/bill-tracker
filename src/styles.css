@@ -1167,8 +1167,22 @@ body {
 }
 
 /* Select mode: checkbox, emoji, info, amount (no action buttons). */
-.tx-list li:has(> input[type='checkbox']) {
+.tx-list li:has(> input[type='checkbox']),
+.recurring-list li:has(> input[type='checkbox']) {
   grid-template-columns: auto auto 1fr auto;
+}
+
+.recurring-list input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.list-count .btn.small {
+  margin-left: 12px;
+  padding: 4px 12px;
+  font-size: 12.5px;
 }
 
 .tx-list li:last-child {

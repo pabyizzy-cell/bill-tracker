@@ -297,6 +297,37 @@ export default function App() {
     return ok;
   }
 
+  // Select several existing entries and make them all repeat on the same
+  // schedule. Same-description rows collapse to one item (latest date wins),
+  // and descriptions already tracked get updated rather than duplicated.
+  async function bulkMarkRecurring(ids, frequency) {
+    const wanted = new Set(ids);
+    const byDescription = new Map();
+    for (const t of transactions) {
+      if (!wanted.has(t.id)) continue;
+      const key = t.description.trim().toLowerCase();
+      const prev = byDescription.get(key);
+      if (!prev || t.date > prev.anchorDate) {
+        byDescription.set(key, {
+          type: t.type,
+          description: t.description,
+          amountCents: t.amountCents,
+          category: t.category,
+          frequency,
+          anchorDate: t.date,
+        });
+      }
+    }
+    const { added, updated } = await upsertRecurring([...byDescription.values()]);
+    const bits = [];
+    if (added > 0) bits.push(`${added} new recurring item${added === 1 ? '' : 's'}`);
+    if (updated > 0) bits.push(`${updated} updated`);
+    setImportNotice(
+      `Marked ${ids.length} ${ids.length === 1 ? 'entry' : 'entries'} as repeating (${FREQUENCY_LABELS[frequency].toLowerCase()})${bits.length > 0 ? ` — ${bits.join(', ')}` : ''}. See “Recurring bills & deposits” below.`,
+    );
+    return added > 0 || updated > 0;
+  }
+
   async function loadSampleData() {
     if (transactions.length > 0 && !window.confirm('Replace your current data with sample data?')) {
       return;
@@ -688,6 +719,7 @@ export default function App() {
         onDelete={deleteTransaction}
         onBulkDelete={bulkDeleteTransactions}
         onBulkCategory={bulkChangeCategory}
+        onBulkRecurring={bulkMarkRecurring}
         onLoadSample={ownData && transactions.length === 0 ? loadSampleData : null}
         canEdit={!readOnly}
       />
@@ -698,6 +730,7 @@ export default function App() {
         canWrite={!readOnly}
         onUpdate={recurring.update}
         onRemove={recurring.remove}
+        onBulkRemove={recurring.removeMany}
       />
 
       {store.cloudMode && ownData ? (
