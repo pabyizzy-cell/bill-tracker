@@ -6,5 +6,7 @@
 // NEVER put the service_role / secret key in this file or anywhere in the app.
 //
 // Leave both blank to run the app in local-only mode (browser localStorage).
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+export const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ?? 'https://jmxbcefszodysicrqztn.supabase.co';
+export const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ?? 'sb_publishable_SmTIP8KaFZZY6TgM8D8abA_oGrbIHqn';
