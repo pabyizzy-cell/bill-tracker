@@ -284,6 +284,135 @@ body {
   border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
+.alert strong {
+  color: var(--text);
+}
+
+.context-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.context-switcher select {
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  outline: none;
+  max-width: 280px;
+}
+
+.context-switcher select:focus {
+  border-color: var(--accent);
+}
+
+/* ---------- Sharing panel ---------- */
+
+.share-intro {
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.share-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.share-form input,
+.share-form select {
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  outline: none;
+}
+
+.share-form input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.share-form input:focus,
+.share-form select:focus {
+  border-color: var(--accent);
+}
+
+.share-message {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.share-message.ok {
+  color: var(--green);
+}
+
+.share-message.error {
+  color: var(--rose);
+}
+
+.share-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.share-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 4px;
+  border-bottom: 1px solid rgba(34, 48, 74, 0.6);
+}
+
+.share-list li:last-child {
+  border-bottom: none;
+}
+
+.share-email {
+  flex: 1;
+  min-width: 180px;
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.share-list select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  outline: none;
+}
+
+.empty-note.slim {
+  margin: 16px 4px 4px;
+  text-align: left;
+}
+
+.card code {
+  background: rgba(11, 17, 32, 0.7);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12.5px;
+}
+
 /* ---------- Cards ---------- */
 
 .card {

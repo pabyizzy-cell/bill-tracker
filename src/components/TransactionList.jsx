@@ -9,6 +9,7 @@ export default function TransactionList({
   onEdit,
   onDelete,
   onLoadSample,
+  canEdit = true,
 }) {
   return (
     <section className="card">
@@ -33,7 +34,11 @@ export default function TransactionList({
               </button>
             </>
           ) : (
-            <p className="empty-sub">Use the form above to add a transaction for this month.</p>
+            <p className="empty-sub">
+              {canEdit
+                ? 'Use the form above to add a transaction for this month.'
+                : 'Nothing has been recorded for this month.'}
+            </p>
           )}
         </div>
       ) : (
@@ -59,24 +64,26 @@ export default function TransactionList({
                   {isIncome ? '+' : '−'}
                   {formatCents(t.amountCents)}
                 </span>
-                <div className="tx-actions">
-                  <button
-                    type="button"
-                    className="btn icon"
-                    onClick={() => onEdit(t.id)}
-                    aria-label={`Edit ${t.description}`}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    type="button"
-                    className="btn icon"
-                    onClick={() => onDelete(t.id)}
-                    aria-label={`Delete ${t.description}`}
-                  >
-                    🗑️
-                  </button>
-                </div>
+                {canEdit ? (
+                  <div className="tx-actions">
+                    <button
+                      type="button"
+                      className="btn icon"
+                      onClick={() => onEdit(t.id)}
+                      aria-label={`Edit ${t.description}`}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className="btn icon"
+                      onClick={() => onDelete(t.id)}
+                      aria-label={`Delete ${t.description}`}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ) : null}
               </li>
             );
           })}

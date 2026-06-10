@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import AuthPanel from './components/AuthPanel.jsx';
 import CategoryDonut from './components/CategoryDonut.jsx';
 import MonthPicker from './components/MonthPicker.jsx';
+import SharingPanel from './components/SharingPanel.jsx';
 import SummaryCards from './components/SummaryCards.jsx';
 import TransactionForm from './components/TransactionForm.jsx';
 import TransactionList from './components/TransactionList.jsx';
@@ -9,18 +10,61 @@ import TrendChart from './components/TrendChart.jsx';
 import { getCategory } from './data/categories.js';
 import { generateSampleData } from './data/sampleData.js';
 import { useAuth } from './hooks/useAuth.js';
+import { useShares } from './hooks/useShares.js';
 import { useTransactions } from './hooks/useTransactions.js';
 import { currentMonthKey, lastNMonths, monthKeyOf } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
 
+const CONTEXT_KEY = 'bill-tracker:context:v1';
+
 export default function App() {
   const { session } = useAuth();
-  const store = useTransactions(session);
+  const shares = useShares(session);
+  const [pickedOwnerId, setPickedOwnerId] = useState(() => {
+    try {
+      return window.localStorage.getItem(CONTEXT_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+
+  // Whose dataset is open. Falls back to the user's own data whenever the
+  // picked context no longer exists (e.g. access was revoked).
+  const contexts = useMemo(() => {
+    if (!session) return [];
+    return [
+      { ownerId: session.user.id, ownerEmail: session.user.email, role: 'owner' },
+      ...shares.sharedWithMe.map((s) => ({
+        ownerId: s.owner_id,
+        ownerEmail: s.owner_email,
+        role: s.role,
+      })),
+    ];
+  }, [session, shares.sharedWithMe]);
+
+  const context = useMemo(() => {
+    if (!session) return null;
+    return contexts.find((c) => c.ownerId === pickedOwnerId) ?? contexts[0];
+  }, [session, contexts, pickedOwnerId]);
+
+  function switchContext(ownerId) {
+    setPickedOwnerId(ownerId);
+    try {
+      window.localStorage.setItem(CONTEXT_KEY, ownerId);
+    } catch {
+      // Best effort — losing the preference is harmless.
+    }
+  }
+
+  const store = useTransactions(session, context);
   const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
   const [editingId, setEditingId] = useState(null);
   const formRef = useRef(null);
   const importRef = useRef(null);
+
+  const ownData = !store.cloudMode || !context || context.role === 'owner';
+  const readOnly = store.cloudMode && !store.canWrite;
 
   const monthTransactions = useMemo(
     () =>
@@ -192,7 +236,7 @@ export default function App() {
 
   const editingTx = transactions.find((t) => t.id === editingId) ?? null;
   const showImportBanner =
-    store.cloudMode && !store.loading && transactions.length === 0 && store.localCount > 0;
+    store.cloudMode && ownData && !store.loading && transactions.length === 0 && store.localCount > 0;
 
   return (
     <div className="app">
@@ -212,23 +256,37 @@ export default function App() {
           <button type="button" className="btn ghost" onClick={exportJson} disabled={!transactions.length}>
             Backup
           </button>
-          <button type="button" className="btn ghost" onClick={() => importRef.current?.click()}>
-            Restore
-          </button>
-          <button type="button" className="btn ghost danger" onClick={clearAll} disabled={!transactions.length}>
-            Clear
-          </button>
-          <input
-            ref={importRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={importJson}
-          />
+          {ownData ? (
+            <>
+              <button type="button" className="btn ghost" onClick={() => importRef.current?.click()}>
+                Restore
+              </button>
+              <button
+                type="button"
+                className="btn ghost danger"
+                onClick={clearAll}
+                disabled={!transactions.length}
+              >
+                Clear
+              </button>
+              <input
+                ref={importRef}
+                type="file"
+                accept=".json,application/json"
+                hidden
+                onChange={importJson}
+              />
+            </>
+          ) : null}
         </div>
       </header>
 
-      <AuthPanel session={session} />
+      <AuthPanel
+        session={session}
+        contexts={contexts}
+        activeOwnerId={context?.ownerId ?? ''}
+        onSwitch={switchContext}
+      />
 
       {store.error ? (
         <div className="alert error">
@@ -239,7 +297,14 @@ export default function App() {
         </div>
       ) : null}
 
-      {store.loading ? <div className="alert info">Syncing with your account…</div> : null}
+      {store.loading ? <div className="alert info">Syncing…</div> : null}
+
+      {!ownData ? (
+        <div className="alert info">
+          You're viewing <strong>{context.ownerEmail}</strong>'s data
+          {readOnly ? ' with view-only access.' : ' with full access.'}
+        </div>
+      ) : null}
 
       {showImportBanner ? (
         <div className="alert banner">
@@ -261,15 +326,17 @@ export default function App() {
         <TrendChart data={trend} />
       </div>
 
-      <section className="card" ref={formRef}>
-        <h2>{editingTx ? 'Edit transaction' : 'Add a transaction'}</h2>
-        <TransactionForm
-          key={editingId ?? 'new'}
-          editingTx={editingTx}
-          onSubmit={editingTx ? saveEdit : addTransaction}
-          onCancel={editingTx ? () => setEditingId(null) : null}
-        />
-      </section>
+      {readOnly ? null : (
+        <section className="card" ref={formRef}>
+          <h2>{editingTx ? 'Edit transaction' : 'Add a transaction'}</h2>
+          <TransactionForm
+            key={editingId ?? 'new'}
+            editingTx={editingTx}
+            onSubmit={editingTx ? saveEdit : addTransaction}
+            onCancel={editingTx ? () => setEditingId(null) : null}
+          />
+        </section>
+      )}
 
       <TransactionList
         transactions={monthTransactions}
@@ -277,8 +344,19 @@ export default function App() {
         editingId={editingId}
         onEdit={startEdit}
         onDelete={deleteTransaction}
-        onLoadSample={transactions.length === 0 ? loadSampleData : null}
+        onLoadSample={ownData && transactions.length === 0 ? loadSampleData : null}
+        canEdit={!readOnly}
       />
+
+      {store.cloudMode && ownData ? (
+        <SharingPanel
+          available={shares.available}
+          shares={shares.myShares}
+          onAdd={shares.addShare}
+          onUpdate={shares.updateShare}
+          onRemove={shares.removeShare}
+        />
+      ) : null}
 
       <footer className="app-footer">
         {store.cloudMode

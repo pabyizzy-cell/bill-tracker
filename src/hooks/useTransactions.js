@@ -23,38 +23,46 @@ const fromRow = (r) => ({
   date: r.date,
 });
 
+const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
+
 // Single source of truth for transactions. When Supabase is configured and a
 // user is signed in, reads/writes go to the cloud; otherwise localStorage.
-// All mutators return true on success so callers can keep their flow simple.
-export function useTransactions(session) {
+//
+// `context` says whose dataset is open: { ownerId, ownerEmail, role } where
+// role is 'owner', 'editor', or 'viewer'. Every cloud query is scoped to
+// that owner's rows — row-level security enforces the same boundary
+// server-side, this just keeps the app honest and fast.
+export function useTransactions(session, context) {
   const [local, setLocal] = useLocalStorage(STORAGE_KEY, []);
   const [cloud, setCloud] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const cloudMode = Boolean(supabase && session);
-  const userId = session?.user?.id;
+  const ownerId = context?.ownerId ?? session?.user?.id;
+  const canWrite = !cloudMode || !context || context.role !== 'viewer';
 
   useEffect(() => {
-    if (!cloudMode) return undefined;
+    if (!cloudMode || !ownerId) return undefined;
     let cancelled = false;
     setLoading(true);
     setError('');
     supabase
       .from('transactions')
       .select('*')
+      .eq('user_id', ownerId)
       .order('date', { ascending: false })
       .order('inserted_at', { ascending: false })
       .then(({ data, error: err }) => {
         if (cancelled) return;
-        if (err) setError(`Couldn't load your data: ${err.message}`);
+        if (err) setError(`Couldn't load this data: ${err.message}`);
         else setCloud((data ?? []).map(fromRow));
         setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [cloudMode, userId]);
+  }, [cloudMode, ownerId]);
 
   const add = useCallback(
     async (tx) => {
@@ -64,7 +72,7 @@ export function useTransactions(session) {
       }
       const { data, error: err } = await supabase
         .from('transactions')
-        .insert(toRow(tx))
+        .insert({ ...toRow(tx), user_id: ownerId })
         .select()
         .single();
       if (err) {
@@ -74,7 +82,7 @@ export function useTransactions(session) {
       setCloud((prev) => [fromRow(data), ...prev]);
       return true;
     },
-    [cloudMode, setLocal],
+    [cloudMode, ownerId, setLocal],
   );
 
   const update = useCallback(
@@ -117,6 +125,7 @@ export function useTransactions(session) {
   );
 
   // Wholesale replacement — used by Restore, sample data, and Clear ([]).
+  // Only ever offered on the user's own dataset.
   const replaceAll = useCallback(
     async (list) => {
       if (!cloudMode) {
@@ -124,12 +133,10 @@ export function useTransactions(session) {
         return true;
       }
       setLoading(true);
-      // RLS limits this to the signed-in user's rows; the filter is just
-      // PostgREST's required "no unscoped deletes" guard.
       const { error: delErr } = await supabase
         .from('transactions')
         .delete()
-        .not('id', 'is', null);
+        .eq('user_id', ownerId);
       if (delErr) {
         setLoading(false);
         setError(`Couldn't replace data: ${delErr.message}`);
@@ -137,7 +144,7 @@ export function useTransactions(session) {
       }
       const inserted = [];
       for (let i = 0; i < list.length; i += INSERT_CHUNK) {
-        const chunk = list.slice(i, i + INSERT_CHUNK).map(toRow);
+        const chunk = list.slice(i, i + INSERT_CHUNK).map((t) => ({ ...toRow(t), user_id: ownerId }));
         const { data, error: insErr } = await supabase
           .from('transactions')
           .insert(chunk)
@@ -150,25 +157,22 @@ export function useTransactions(session) {
         }
         inserted.push(...data);
       }
-      setCloud(
-        inserted
-          .map(fromRow)
-          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
-      );
+      setCloud(inserted.map(fromRow).sort(byDateDesc));
       setLoading(false);
       return true;
     },
-    [cloudMode, setLocal],
+    [cloudMode, ownerId, setLocal],
   );
 
-  // Copies this browser's local entries into the signed-in account, then
-  // clears the local copy so they aren't imported twice.
+  // Copies this browser's local entries into the signed-in user's own
+  // dataset, then clears the local copy so they aren't imported twice.
   const importLocal = useCallback(async () => {
     if (!cloudMode || local.length === 0) return false;
+    const ownId = session.user.id;
     setLoading(true);
     const inserted = [];
     for (let i = 0; i < local.length; i += INSERT_CHUNK) {
-      const chunk = local.slice(i, i + INSERT_CHUNK).map(toRow);
+      const chunk = local.slice(i, i + INSERT_CHUNK).map((t) => ({ ...toRow(t), user_id: ownId }));
       const { data, error: insErr } = await supabase.from('transactions').insert(chunk).select();
       if (insErr) {
         setLoading(false);
@@ -177,21 +181,18 @@ export function useTransactions(session) {
       }
       inserted.push(...data);
     }
-    setCloud((prev) =>
-      [...inserted.map(fromRow), ...prev].sort((a, b) =>
-        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
-      ),
-    );
+    setCloud((prev) => [...inserted.map(fromRow), ...prev].sort(byDateDesc));
     setLocal([]);
     setLoading(false);
     return true;
-  }, [cloudMode, local, setLocal]);
+  }, [cloudMode, local, session, setLocal]);
 
   const dismissError = useCallback(() => setError(''), []);
 
   return {
     transactions: cloudMode ? cloud : local,
     cloudMode,
+    canWrite,
     localCount: local.length,
     loading,
     error,

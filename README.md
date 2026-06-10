@@ -78,6 +78,22 @@ in local mode; after signing in it offers to import anything you'd entered
 locally. The single-file build stays local-only (magic links can't redirect
 to a `file://` page).
 
+### Sharing your data with other people
+
+Run `supabase/migrations/0002_sharing.sql` (same SQL Editor drill) to enable
+sharing. A signed-in user then gets a **Sharing** panel listing the emails
+allowed to open their data, each with an access level:
+
+- **Full access** — add, edit, and delete entries
+- **View only** — see everything, change nothing
+
+The person you share with signs in with their own email (no invite step);
+the app shows a switcher between their own data and anything shared with
+them. Permissions are enforced by Postgres row-level security — the access
+level holds even against direct API calls, and changing or removing someone
+on the list takes effect immediately. Bulk actions (Restore, Clear, sample
+data) stay owner-only.
+
 ## Deploying to GitHub Pages
 
 `.github/workflows/deploy.yml` builds the app and publishes it to GitHub

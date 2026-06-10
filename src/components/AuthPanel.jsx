@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient.js';
 
-// Magic-link sign-in. Renders nothing when cloud sync isn't configured, and
-// hides on file:// (magic links can't redirect back to a local file).
-export default function AuthPanel({ session }) {
+// Magic-link sign-in plus, once signed in, a switcher between your own data
+// and any datasets shared with you. Renders nothing when cloud sync isn't
+// configured, and hides on file:// (magic links can't redirect to a file).
+export default function AuthPanel({ session, contexts, activeOwnerId, onSwitch }) {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
   const [message, setMessage] = useState('');
@@ -15,8 +16,22 @@ export default function AuthPanel({ session }) {
     return (
       <div className="auth-bar signed-in">
         <span className="auth-status">
-          <span className="auth-dot" /> Syncing as <strong>{session.user.email}</strong>
+          <span className="auth-dot" /> Signed in as <strong>{session.user.email}</strong>
         </span>
+        {contexts.length > 1 ? (
+          <label className="context-switcher">
+            Viewing
+            <select value={activeOwnerId} onChange={(e) => onSwitch(e.target.value)}>
+              {contexts.map((c) => (
+                <option key={c.ownerId} value={c.ownerId}>
+                  {c.role === 'owner'
+                    ? 'My data'
+                    : `${c.ownerEmail} (${c.role === 'editor' ? 'full access' : 'view only'})`}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <button type="button" className="btn ghost" onClick={() => supabase.auth.signOut()}>
           Sign out
         </button>
