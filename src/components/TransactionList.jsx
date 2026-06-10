@@ -23,7 +23,6 @@ export default function TransactionList({
   onLoadSample,
   canEdit = true,
 }) {
-  const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
 
   // Different month or query = different rows; stale selections would be
@@ -92,22 +91,10 @@ export default function TransactionList({
             placeholder="Search all transactions…"
             aria-label="Search transactions"
           />
-          {canEdit && transactions.length > 0 ? (
-            <button
-              type="button"
-              className={`btn ghost ${selectMode ? 'active' : ''}`}
-              onClick={() => {
-                setSelectMode((v) => !v);
-                setSelected(new Set());
-              }}
-            >
-              {selectMode ? 'Done selecting' : 'Select'}
-            </button>
-          ) : null}
         </div>
       ) : null}
 
-      {selectMode && transactions.length > 0 ? (
+      {canEdit && transactions.length > 0 ? (
         <div className="bulk-bar">
           <label className="bulk-check">
             <input
@@ -167,7 +154,11 @@ export default function TransactionList({
                 Delete selected
               </button>
             </>
-          ) : null}
+          ) : (
+            <span className="bulk-hint">
+              tick entries to delete, re-categorize, or mark several as repeating at once
+            </span>
+          )}
         </div>
       ) : null}
 
@@ -209,7 +200,7 @@ export default function TransactionList({
             const isIncome = t.type === 'income';
             return (
               <li key={t.id} className={editingId === t.id ? 'editing' : ''}>
-                {selectMode ? (
+                {canEdit ? (
                   <input
                     type="checkbox"
                     checked={selected.has(t.id)}
@@ -233,7 +224,7 @@ export default function TransactionList({
                   {isIncome ? '+' : '−'}
                   {formatCents(t.amountCents)}
                 </span>
-                {canEdit && !selectMode ? (
+                {canEdit ? (
                   <div className="tx-actions">
                     <button
                       type="button"

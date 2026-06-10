@@ -131,8 +131,9 @@ check(
 await page.locator('.search-input').fill('');
 await page.waitForTimeout(200);
 
-// Bulk select existing entries: change category, mark as repeating, delete.
-await page.locator('.list-tools').getByRole('button', { name: 'Select' }).click();
+// Bulk select existing entries (checkboxes are always visible):
+// change category, mark as repeating, delete.
+const txSection = page.locator('section.card', { has: page.locator('.tx-list') });
 await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
 await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
 await page
@@ -163,7 +164,7 @@ check(
 await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
 await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
 page.once('dialog', (d) => d.accept());
-await page.locator('.bulk-bar').getByRole('button', { name: 'Delete selected' }).click();
+await txSection.getByRole('button', { name: 'Delete selected' }).click();
 await page.waitForTimeout(300);
 check(
   'bulk delete removes the selected rows',
@@ -174,11 +175,9 @@ check(
   'deleting transactions keeps their recurring schedules',
   (await page.locator('.recurring-list li').count()) === 3,
 );
-await page.getByRole('button', { name: 'Done selecting' }).click();
 
 // Bulk delete in the recurring card prunes schedules.
 const recSection = page.locator('section.card', { hasText: 'Recurring bills & deposits' });
-await recSection.getByRole('button', { name: 'Select', exact: true }).click();
 await page
   .locator('.recurring-list input[aria-label="Select recurring STARBUCKS STORE 123, SEATTLE"]')
   .check();
@@ -192,7 +191,6 @@ check(
   'recurring bulk delete prunes the list',
   (await page.locator('.recurring-list li').count()) === 1,
 );
-await recSection.getByRole('button', { name: 'Done selecting' }).click();
 
 // Re-import the same file: everything should be a duplicate.
 page.once('dialog', async (d) => {

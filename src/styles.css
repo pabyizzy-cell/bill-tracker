@@ -1166,10 +1166,11 @@ body {
   border-radius: 10px;
 }
 
-/* Select mode: checkbox, emoji, info, amount (no action buttons). */
+/* Rows with an always-present select checkbox: checkbox, emoji, info,
+   amount, actions. */
 .tx-list li:has(> input[type='checkbox']),
 .recurring-list li:has(> input[type='checkbox']) {
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto auto;
 }
 
 .recurring-list input[type='checkbox'] {
@@ -1179,10 +1180,10 @@ body {
   flex-shrink: 0;
 }
 
-.list-count .btn.small {
-  margin-left: 12px;
-  padding: 4px 12px;
+.bulk-hint {
   font-size: 12.5px;
+  color: var(--muted);
+  opacity: 0.8;
 }
 
 .tx-list li:last-child {
@@ -1313,6 +1314,12 @@ body {
 
   .tx-list li {
     grid-template-columns: auto 1fr auto;
+  }
+
+  /* On phones the action buttons wrap onto their own line. */
+  .tx-list li:has(> input[type='checkbox']),
+  .recurring-list li:has(> input[type='checkbox']) {
+    grid-template-columns: auto auto 1fr auto;
   }
 
   .tx-actions {

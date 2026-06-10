@@ -18,7 +18,6 @@ export default function RecurringList({
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState('');
-  const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
 
   if (!available) return null; // ProjectionCard already shows the migration hint.
@@ -106,23 +105,10 @@ export default function RecurringList({
         <h2>Recurring bills & deposits</h2>
         <span className="list-count">
           {items.length} {items.length === 1 ? 'item' : 'items'}
-          {canWrite && items.length > 0 ? (
-            <button
-              type="button"
-              className={`btn ghost small ${selectMode ? 'active' : ''}`}
-              onClick={() => {
-                setSelectMode((v) => !v);
-                setSelected(new Set());
-                setEditingId(null);
-              }}
-            >
-              {selectMode ? 'Done selecting' : 'Select'}
-            </button>
-          ) : null}
         </span>
       </div>
 
-      {selectMode && items.length > 0 ? (
+      {canWrite && items.length > 0 ? (
         <div className="bulk-bar">
           <label className="bulk-check">
             <input
@@ -139,7 +125,9 @@ export default function RecurringList({
             <button type="button" className="btn ghost danger" onClick={bulkDelete}>
               Delete selected
             </button>
-          ) : null}
+          ) : (
+            <span className="bulk-hint">tick items to delete several at once</span>
+          )}
         </div>
       ) : null}
 
@@ -176,7 +164,7 @@ export default function RecurringList({
             const editing = editingId === item.id;
             return (
               <li key={item.id} className={editing ? 'editing' : ''}>
-                {selectMode ? (
+                {canWrite ? (
                   <input
                     type="checkbox"
                     checked={selected.has(item.id)}
@@ -229,7 +217,7 @@ export default function RecurringList({
                   {isIncome ? '+' : '−'}
                   {formatCents(item.amountCents)}
                 </span>
-                {canWrite && !selectMode ? (
+                {canWrite ? (
                   <div className="tx-actions">
                     {editing ? (
                       <>
