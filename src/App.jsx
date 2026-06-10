@@ -184,9 +184,23 @@ export default function App() {
   }
 
   async function saveEdit(payload) {
-    const { repeat: _ignored, ...tx } = payload;
+    const { repeat, ...tx } = payload;
     const ok = await store.update(editingId, tx);
     if (ok) {
+      // Editing is also how an existing entry (e.g. from an earlier CSV
+      // import) gets promoted to a recurring bill/deposit.
+      if (repeat && repeat !== 'once') {
+        await addRecurringIfNew([
+          {
+            type: tx.type,
+            description: tx.description,
+            amountCents: tx.amountCents,
+            category: tx.category,
+            frequency: repeat,
+            anchorDate: tx.date,
+          },
+        ]);
+      }
       setEditingId(null);
       setMonth(monthKeyOf(tx.date));
     }

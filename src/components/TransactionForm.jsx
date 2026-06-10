@@ -35,7 +35,7 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
       amountCents,
       category,
       date,
-      repeat: editingTx ? 'once' : repeat,
+      repeat,
     });
     if (ok && !editingTx) {
       // Keep type, category, and date so several similar entries can be added quickly.
@@ -96,18 +96,16 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
           Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
-        {!editingTx ? (
-          <label>
-            Repeats
-            <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
-              <option value="once">One-time</option>
-              <option value="weekly">Every week</option>
-              <option value="biweekly">Every 2 weeks</option>
-              <option value="monthly">Every month</option>
-              <option value="yearly">Every year</option>
-            </select>
-          </label>
-        ) : null}
+        <label>
+          Repeats
+          <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+            <option value="once">{editingTx ? 'One-time / unchanged' : 'One-time'}</option>
+            <option value="weekly">Every week</option>
+            <option value="biweekly">Every 2 weeks</option>
+            <option value="monthly">Every month</option>
+            <option value="yearly">Every year</option>
+          </select>
+        </label>
       </div>
 
       {error ? <p className="form-error">{error}</p> : null}
