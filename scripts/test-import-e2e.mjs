@@ -45,6 +45,25 @@ check('review shows 3 new transactions', summary.includes('3') && summary.includ
 const skips = await banner.locator('.import-skips').first().innerText();
 check('review notes the skipped card payment', /1 card payment/.test(skips));
 
+// Bulk-apply: select all rows, set them to monthly, then bulk-set back to
+// one-time — the per-row dropdowns must follow both times.
+await banner.locator('input[aria-label="Select all rows"]').check();
+await banner
+  .locator('select[aria-label="Set recurrence for selected rows"]')
+  .selectOption('monthly');
+check(
+  'bulk apply sets every row dropdown',
+  (await banner.locator('.import-repeat').evaluateAll((els) => els.every((e) => e.value === 'monthly'))),
+);
+await banner.locator('input[aria-label="Select all rows"]').check();
+await banner
+  .locator('select[aria-label="Set recurrence for selected rows"]')
+  .selectOption('once');
+check(
+  'bulk apply can set rows back to one-time',
+  (await banner.locator('.import-repeat').evaluateAll((els) => els.every((e) => e.value === 'once'))),
+);
+
 // Mark the Netflix row as a monthly recurring bill.
 await banner
   .locator('select[aria-label="Recurrence for NETFLIX.COM"]')
@@ -100,6 +119,41 @@ check(
   'summary cards include imported spending',
   (await page.locator('.summary-value').first().innerText()) !== undefined,
 );
+
+// Search across all months.
+await page.locator('.search-input').fill('starb');
+await page.waitForTimeout(200);
+check(
+  'search finds matches across months',
+  (await page.locator('.tx-list li').count()) === 1 &&
+    (await page.getByText(/1 match across all months/).isVisible()),
+);
+await page.locator('.search-input').fill('');
+await page.waitForTimeout(200);
+
+// Bulk select: change category for two rows, then bulk delete them.
+await page.getByRole('button', { name: 'Select', exact: true }).click();
+await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
+await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
+await page
+  .locator('select[aria-label="Change category for selected transactions"]')
+  .selectOption('dining');
+await page.waitForTimeout(200);
+check(
+  'bulk category change reports what it did',
+  await page.getByText(/Moved 2 transactions to Dining Out/).isVisible(),
+);
+await page.locator('.tx-list input[aria-label="Select STARBUCKS STORE 123, SEATTLE"]').check();
+await page.locator('.tx-list input[aria-label="Select WHOLEFDS MKT 10259"]').check();
+page.once('dialog', (d) => d.accept());
+await page.getByRole('button', { name: 'Delete selected' }).click();
+await page.waitForTimeout(300);
+check(
+  'bulk delete removes the selected rows',
+  !(await page.getByText('STARBUCKS STORE 123, SEATTLE').isVisible()) &&
+    (await page.locator('.tx-list li').count()) === 1,
+);
+await page.getByRole('button', { name: 'Done selecting' }).click();
 
 // Re-import the same file: everything should be a duplicate.
 page.once('dialog', async (d) => {

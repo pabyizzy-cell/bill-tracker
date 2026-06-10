@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { getCategory } from '../data/categories.js';
-import { formatDate, todayISO } from '../lib/dates.js';
+import { addDaysISO, formatDate, todayISO } from '../lib/dates.js';
 import { formatCents, parseAmountToCents } from '../lib/money.js';
-import { FREQUENCY_LABELS, nextOccurrence } from '../lib/projection.js';
+import { FREQUENCY_LABELS, nextOccurrence, occurrencesBetween } from '../lib/projection.js';
 
 // The recurring bills/deposits behind the projections. Amount, frequency,
 // and schedule date are editable in place; description/category come from
@@ -17,6 +17,18 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
   const sorted = [...items].sort((a, b) =>
     a.type === b.type ? b.amountCents - a.amountCents : a.type === 'income' ? -1 : 1,
   );
+
+  // What lands in the next 7 days, in order — the "what's due this week"
+  // glance that bill apps are loved for.
+  const today = todayISO();
+  const upcoming = items
+    .flatMap((item) =>
+      occurrencesBetween(item, addDaysISO(today, 1), addDaysISO(today, 7)).map((date) => ({
+        date,
+        item,
+      })),
+    )
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
 
   function startEdit(item) {
     setEditingId(item.id);
@@ -63,6 +75,22 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
           {items.length} {items.length === 1 ? 'item' : 'items'}
         </span>
       </div>
+
+      {upcoming.length > 0 ? (
+        <div className="upcoming-strip">
+          <span className="upcoming-label">Next 7 days:</span>
+          {upcoming.map(({ date, item }, i) => (
+            <span key={`${item.id}-${date}-${i}`} className="upcoming-chip">
+              {getCategory(item.category).emoji} {item.description}{' '}
+              <strong className={item.type === 'income' ? 'income' : 'expense'}>
+                {item.type === 'income' ? '+' : '−'}
+                {formatCents(item.amountCents)}
+              </strong>{' '}
+              {formatDate(date)}
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {items.length === 0 ? (
         <p className="empty-note slim">

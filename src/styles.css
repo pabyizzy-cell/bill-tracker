@@ -353,6 +353,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.projection-stats .btn.link {
+  margin-left: 8px;
+  font-size: 12px;
+}
+
 .projection-stats strong.pos {
   color: var(--green);
 }
@@ -461,6 +466,110 @@ body {
   color: var(--muted);
 }
 
+/* ---------- List tools (search + select) ---------- */
+
+.list-tools {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  flex: 1;
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+.btn.ghost.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: rgba(108, 140, 255, 0.08);
+  border: 1px solid rgba(108, 140, 255, 0.3);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.bulk-check,
+.bulk-apply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bulk-bar input[type='checkbox'],
+.import-preview input[type='checkbox'],
+.tx-list input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.bulk-apply select {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  outline: none;
+}
+
+/* ---------- Upcoming bills strip ---------- */
+
+.upcoming-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.upcoming-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.upcoming-chip {
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.upcoming-chip strong.income {
+  color: var(--green);
+}
+
+.upcoming-chip strong.expense {
+  color: var(--rose);
+}
+
 /* ---------- Recurring list ---------- */
 
 .recurring-list {
@@ -551,7 +660,7 @@ body {
 
 .import-preview li {
   display: grid;
-  grid-template-columns: 110px 1fr auto auto auto;
+  grid-template-columns: auto 110px 1fr auto auto auto;
   gap: 12px;
   align-items: center;
   padding: 8px 4px;
@@ -603,7 +712,7 @@ body {
 
 @media (max-width: 560px) {
   .import-preview li {
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: auto 1fr auto auto;
   }
 
   .import-date,
@@ -1015,6 +1124,11 @@ body {
   padding: 12px 6px;
   border-bottom: 1px solid rgba(34, 48, 74, 0.6);
   border-radius: 10px;
+}
+
+/* Select mode: checkbox, emoji, info, amount (no action buttons). */
+.tx-list li:has(> input[type='checkbox']) {
+  grid-template-columns: auto auto 1fr auto;
 }
 
 .tx-list li:last-child {

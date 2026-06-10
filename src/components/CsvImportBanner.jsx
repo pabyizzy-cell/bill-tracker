@@ -3,17 +3,29 @@ import { getCategory } from '../data/categories.js';
 import { formatDate } from '../lib/dates.js';
 import { formatCents } from '../lib/money.js';
 
+const RECURRENCE_OPTIONS = [
+  ['once', 'One-time'],
+  ['weekly', 'Every week'],
+  ['biweekly', 'Every 2 weeks'],
+  ['monthly', 'Every month'],
+  ['yearly', 'Every year'],
+];
+
 // Review step for a parsed bank CSV. Every row gets a dropdown to mark it as
-// a one-time transaction or a recurring bill/deposit; nothing is saved until
-// the user confirms. onConfirm receives the recurrence choice per row.
+// a one-time transaction or a recurring bill/deposit — individually, or in
+// bulk by ticking rows and applying a choice to all of them at once.
+// Nothing is saved until the user confirms.
 export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) {
   const { format, toAdd, duplicates, skippedTransfers, skippedUnreadable } = pending;
   const [choices, setChoices] = useState(() => toAdd.map(() => 'once'));
+  const [checked, setChecked] = useState(() => toAdd.map(() => false));
 
   const expenses = toAdd.filter((t) => t.type === 'expense').length;
   const income = toAdd.length - expenses;
   const dates = toAdd.map((t) => t.date).sort();
   const recurringCount = choices.filter((c) => c !== 'once').length;
+  const checkedCount = checked.filter(Boolean).length;
+  const allChecked = checkedCount === toAdd.length;
 
   const skippedBits = [];
   if (skippedTransfers > 0) {
@@ -30,6 +42,11 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
     setChoices((prev) => prev.map((c, i) => (i === index ? value : c)));
   }
 
+  function applyToChecked(value) {
+    setChoices((prev) => prev.map((c, i) => (checked[i] ? value : c)));
+    setChecked(toAdd.map(() => false));
+  }
+
   return (
     <section className="card import-card">
       <h2>Review import · {format}</h2>
@@ -43,8 +60,39 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
       ) : null}
       <p className="import-skips">
         Mark anything that repeats — rent, paychecks, subscriptions — and it will also power your
-        balance projections.
+        balance projections. Tick several rows to set them all at once.
       </p>
+
+      <div className="bulk-bar">
+        <label className="bulk-check">
+          <input
+            type="checkbox"
+            checked={allChecked}
+            onChange={(e) => setChecked(toAdd.map(() => e.target.checked))}
+            aria-label="Select all rows"
+          />
+          {checkedCount > 0 ? `${checkedCount} selected` : 'Select all'}
+        </label>
+        {checkedCount > 0 ? (
+          <label className="bulk-apply">
+            set {checkedCount === 1 ? 'it' : 'them'} to
+            <select
+              value=""
+              onChange={(e) => e.target.value && applyToChecked(e.target.value)}
+              aria-label="Set recurrence for selected rows"
+            >
+              <option value="" disabled>
+                choose…
+              </option>
+              {RECURRENCE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
 
       <ul className="import-preview scrollable">
         {toAdd.map((t, i) => {
@@ -52,6 +100,14 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
           return (
             // Index keys are safe: the list never reorders while visible.
             <li key={i}>
+              <input
+                type="checkbox"
+                checked={checked[i]}
+                onChange={(e) =>
+                  setChecked((prev) => prev.map((c, j) => (j === i ? e.target.checked : c)))
+                }
+                aria-label={`Select ${t.description}`}
+              />
               <span className="import-date">{formatDate(t.date)}</span>
               <span className="import-desc">{t.description}</span>
               <span className="import-cat">
@@ -67,11 +123,11 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
                 onChange={(e) => setChoice(i, e.target.value)}
                 aria-label={`Recurrence for ${t.description}`}
               >
-                <option value="once">One-time</option>
-                <option value="weekly">Every week</option>
-                <option value="biweekly">Every 2 weeks</option>
-                <option value="monthly">Every month</option>
-                <option value="yearly">Every year</option>
+                {RECURRENCE_OPTIONS.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
               </select>
             </li>
           );

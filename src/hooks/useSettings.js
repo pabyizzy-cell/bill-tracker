@@ -44,10 +44,14 @@ export function useSettings(session, context) {
     };
   }, [cloudMode, ownerId]);
 
-  // Stores "my balance is X as of today".
+  // Stores "my balance is X as of <date>" (date defaults to today; Restore
+  // passes the date preserved in the backup).
   const saveStartingBalance = useCallback(
-    async (cents) => {
-      const value = { startingBalanceCents: cents, startingBalanceDate: todayISO() };
+    async (cents, dateISO) => {
+      const value = {
+        startingBalanceCents: cents,
+        startingBalanceDate: dateISO ?? todayISO(),
+      };
       if (!cloudMode) {
         setLocal(value);
         return true;

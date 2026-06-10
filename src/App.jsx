@@ -82,6 +82,7 @@ export default function App() {
   );
   const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [pendingCsv, setPendingCsv] = useState(null);
   const [csvBusy, setCsvBusy] = useState(false);
@@ -100,6 +101,21 @@ export default function App() {
         .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
     [transactions, month],
   );
+
+  // Search ignores the month picker: it scans everything, so entries can
+  // never hide in an unviewed month.
+  const searching = searchQuery.trim().length > 0;
+  const searchResults = useMemo(() => {
+    if (!searching) return [];
+    const q = searchQuery.trim().toLowerCase();
+    return transactions
+      .filter(
+        (t) =>
+          t.description.toLowerCase().includes(q) ||
+          getCategory(t.category).label.toLowerCase().includes(q),
+      )
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }, [transactions, searching, searchQuery]);
 
   const totals = useMemo(() => {
     let income = 0;
@@ -153,6 +169,20 @@ export default function App() {
 
   async function addTransaction(tx) {
     const { repeat, ...fields } = tx;
+    const dupe = transactions.find(
+      (t) =>
+        t.date === fields.date &&
+        t.amountCents === fields.amountCents &&
+        t.description.trim().toLowerCase() === fields.description.trim().toLowerCase(),
+    );
+    if (
+      dupe &&
+      !window.confirm(
+        `You already have "${dupe.description}" for ${formatCents(dupe.amountCents)} on ${dupe.date}. Add it again anyway?`,
+      )
+    ) {
+      return false;
+    }
     const ok = await store.add(fields);
     if (ok) {
       setMonth(monthKeyOf(tx.date));
@@ -237,6 +267,24 @@ export default function App() {
     await store.remove(id);
   }
 
+  async function bulkDeleteTransactions(ids) {
+    if (!window.confirm(`Delete ${ids.length} selected transaction${ids.length === 1 ? '' : 's'}?`)) {
+      return false;
+    }
+    if (ids.includes(editingId)) setEditingId(null);
+    return store.removeMany(ids);
+  }
+
+  async function bulkChangeCategory(ids, category) {
+    const ok = await store.updateMany(ids, { category });
+    if (ok) {
+      setImportNotice(
+        `Moved ${ids.length} transaction${ids.length === 1 ? '' : 's'} to ${getCategory(category).label}.`,
+      );
+    }
+    return ok;
+  }
+
   async function loadSampleData() {
     if (transactions.length > 0 && !window.confirm('Replace your current data with sample data?')) {
       return;
@@ -285,9 +333,11 @@ export default function App() {
   function exportJson() {
     const payload = {
       app: 'bill-tracker',
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       transactions,
+      recurring: recurring.items,
+      settings,
     };
     downloadFile('bill-tracker-backup.json', 'application/json', JSON.stringify(payload, null, 2));
   }
@@ -319,11 +369,58 @@ export default function App() {
             date: t.date,
           }));
         if (cleaned.length === 0) throw new Error('no valid transactions found');
-        if (!window.confirm(`Replace your current data with ${cleaned.length} imported transactions?`)) {
+
+        // Version 2 backups also carry recurring items and the starting
+        // balance; older backups simply leave those untouched.
+        const cleanedRecurring = (Array.isArray(parsed?.recurring) ? parsed.recurring : [])
+          .filter(
+            (r) =>
+              r &&
+              typeof r.description === 'string' &&
+              Number.isFinite(r.amountCents) &&
+              r.amountCents > 0 &&
+              ['weekly', 'biweekly', 'monthly', 'yearly'].includes(r.frequency) &&
+              /^\d{4}-\d{2}-\d{2}$/.test(r.anchorDate ?? ''),
+          )
+          .map((r) => ({
+            type: r.type === 'income' ? 'income' : 'expense',
+            description: r.description,
+            amountCents: Math.round(r.amountCents),
+            category: typeof r.category === 'string' ? r.category : 'other',
+            frequency: r.frequency,
+            anchorDate: r.anchorDate,
+          }));
+        const backupSettings =
+          parsed?.settings &&
+          Number.isFinite(parsed.settings.startingBalanceCents) &&
+          /^\d{4}-\d{2}-\d{2}$/.test(parsed.settings.startingBalanceDate ?? '')
+            ? parsed.settings
+            : null;
+
+        const extras =
+          cleanedRecurring.length > 0 || backupSettings
+            ? ` (plus ${cleanedRecurring.length} recurring item${cleanedRecurring.length === 1 ? '' : 's'}${backupSettings ? ' and your starting balance' : ''})`
+            : '';
+        if (
+          !window.confirm(
+            `Replace your current data with ${cleaned.length} imported transactions${extras}?`,
+          )
+        ) {
           return;
         }
         const ok = await store.replaceAll(cleaned);
-        if (ok) setEditingId(null);
+        if (ok) {
+          if (cleanedRecurring.length > 0 || parsed?.version >= 2) {
+            await recurring.replaceAll(cleanedRecurring);
+          }
+          if (backupSettings) {
+            await saveStartingBalance(
+              Math.round(backupSettings.startingBalanceCents),
+              backupSettings.startingBalanceDate,
+            );
+          }
+          setEditingId(null);
+        }
       } catch (err) {
         window.alert(`Couldn't import that file: ${err.message}`);
       }
@@ -561,12 +658,17 @@ export default function App() {
       )}
 
       <TransactionList
-        transactions={monthTransactions}
+        transactions={searching ? searchResults : monthTransactions}
         totalCount={transactions.length}
         month={month}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        searching={searching}
         editingId={editingId}
         onEdit={startEdit}
         onDelete={deleteTransaction}
+        onBulkDelete={bulkDeleteTransactions}
+        onBulkCategory={bulkChangeCategory}
         onLoadSample={ownData && transactions.length === 0 ? loadSampleData : null}
         canEdit={!readOnly}
       />

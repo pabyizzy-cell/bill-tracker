@@ -13,6 +13,10 @@ charts — no account, no server, no data leaving your browser.
 - **See where it goes** — a donut chart and ranked category breakdown show
   exactly what ate your budget each month.
 - **Spot trends** — income vs. spending compared across the last six months.
+- **Find and fix things fast** — search every month at once, and use Select
+  mode to bulk-delete or re-categorize many transactions in one go. The CSV
+  review screen supports the same: tick rows and set their recurrence
+  together. Backups include recurring items and your starting balance.
 - **See your future balance** — mark transactions as recurring (in the add
   form or the CSV review screen) and an always-visible chart projects your
   balance day-by-day across the next 3 months, flagging the lowest dip. A

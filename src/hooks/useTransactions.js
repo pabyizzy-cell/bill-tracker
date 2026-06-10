@@ -124,6 +124,62 @@ export function useTransactions(session, context) {
     [cloudMode, setLocal],
   );
 
+  const removeMany = useCallback(
+    async (ids) => {
+      if (ids.length === 0) return true;
+      if (!cloudMode) {
+        const gone = new Set(ids);
+        setLocal((prev) => prev.filter((t) => !gone.has(t.id)));
+        return true;
+      }
+      // Chunked: ids travel in the URL, so keep each request modest.
+      for (let i = 0; i < ids.length; i += 100) {
+        const { error: err } = await supabase
+          .from('transactions')
+          .delete()
+          .in('id', ids.slice(i, i + 100));
+        if (err) {
+          setError(`Couldn't delete: ${err.message}`);
+          const gone = new Set(ids.slice(0, i));
+          setCloud((prev) => prev.filter((t) => !gone.has(t.id)));
+          return false;
+        }
+      }
+      const gone = new Set(ids);
+      setCloud((prev) => prev.filter((t) => !gone.has(t.id)));
+      return true;
+    },
+    [cloudMode, setLocal],
+  );
+
+  // Applies the same field changes (e.g. a new category) to several rows.
+  const updateMany = useCallback(
+    async (ids, fields) => {
+      if (ids.length === 0) return true;
+      if (!cloudMode) {
+        const hit = new Set(ids);
+        setLocal((prev) => prev.map((t) => (hit.has(t.id) ? { ...t, ...fields } : t)));
+        return true;
+      }
+      const patch = {};
+      if (fields.category !== undefined) patch.category = fields.category;
+      for (let i = 0; i < ids.length; i += 100) {
+        const { error: err } = await supabase
+          .from('transactions')
+          .update(patch)
+          .in('id', ids.slice(i, i + 100));
+        if (err) {
+          setError(`Couldn't save: ${err.message}`);
+          return false;
+        }
+      }
+      const hit = new Set(ids);
+      setCloud((prev) => prev.map((t) => (hit.has(t.id) ? { ...t, ...fields } : t)));
+      return true;
+    },
+    [cloudMode, setLocal],
+  );
+
   // Bulk append — used by the bank CSV importer. Unlike replaceAll, this
   // never deletes anything.
   const addMany = useCallback(
@@ -235,6 +291,8 @@ export function useTransactions(session, context) {
     addMany,
     update,
     remove,
+    removeMany,
+    updateMany,
     replaceAll,
     importLocal,
   };

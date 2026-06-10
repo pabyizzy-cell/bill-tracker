@@ -32,8 +32,11 @@ export default function ProjectionCard({
   const today = todayISO();
   const horizon = addDaysISO(today, 92);
   const [lookupDate, setLookupDate] = useState(addDaysISO(today, 30));
+  const [adjusting, setAdjusting] = useState(false);
   const [balanceDraft, setBalanceDraft] = useState('');
   const [balanceError, setBalanceError] = useState('');
+
+  const showBalanceForm = canWrite && (!hasStartingBalance || adjusting);
 
   const projection = useMemo(
     () =>
@@ -98,7 +101,16 @@ export default function ProjectionCard({
     }
     setBalanceError('');
     const ok = await onSaveStartingBalance(negative ? -cents : cents);
-    if (ok) setBalanceDraft('');
+    if (ok) {
+      setBalanceDraft('');
+      setAdjusting(false);
+    }
+  }
+
+  function startAdjust() {
+    setBalanceDraft((balanceCents / 100).toFixed(2));
+    setBalanceError('');
+    setAdjusting(true);
   }
 
   return (
@@ -114,6 +126,11 @@ export default function ProjectionCard({
       <div className="projection-stats">
         <span>
           Today: <strong>{formatCents(balanceCents)}</strong>
+          {hasStartingBalance && canWrite ? (
+            <button type="button" className="btn link" onClick={adjusting ? () => setAdjusting(false) : startAdjust}>
+              {adjusting ? 'cancel' : 'adjust'}
+            </button>
+          ) : null}
         </span>
         <span>
           In 3 months:{' '}
@@ -130,11 +147,12 @@ export default function ProjectionCard({
         </span>
       </div>
 
-      {!hasStartingBalance && canWrite ? (
+      {showBalanceForm ? (
         <form className="balance-setup" onSubmit={saveBalance}>
           <span>
-            For real numbers, set your actual bank balance — right now this projects from recorded
-            income minus spending only.
+            {hasStartingBalance
+              ? 'Type what your bank account actually holds right now — projections will re-anchor to it as of today.'
+              : 'For real numbers, set your actual bank balance — right now this projects from recorded income minus spending only.'}
           </span>
           <div className="balance-setup-row">
             <input
@@ -142,9 +160,10 @@ export default function ProjectionCard({
               onChange={(e) => setBalanceDraft(e.target.value)}
               inputMode="decimal"
               placeholder="Balance today, e.g. 3400.00"
+              aria-label="Bank balance today"
             />
             <button type="submit" className="btn primary">
-              Set balance
+              {hasStartingBalance ? 'Update balance' : 'Set balance'}
             </button>
           </div>
           {balanceError ? <p className="form-error">{balanceError}</p> : null}
