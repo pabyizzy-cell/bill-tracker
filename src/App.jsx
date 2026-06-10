@@ -87,9 +87,21 @@ export default function App() {
   const [pendingCsv, setPendingCsv] = useState(null);
   const [csvBusy, setCsvBusy] = useState(false);
   const [importNotice, setImportNotice] = useState('');
+  const [adjustingBalance, setAdjustingBalance] = useState(false);
   const formRef = useRef(null);
   const importRef = useRef(null);
   const csvRef = useRef(null);
+  const projectionRef = useRef(null);
+
+  // The Balance today card's edit button opens the balance editor inside
+  // the projection card and brings it into view.
+  function openBalanceEditor() {
+    setAdjustingBalance(true);
+    setTimeout(
+      () => projectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+      50,
+    );
+  }
 
   const ownData = !store.cloudMode || !context || context.role === 'owner';
   const readOnly = store.cloudMode && !store.canWrite;
@@ -625,7 +637,11 @@ export default function App() {
         </div>
       ) : null}
 
-      <SummaryCards totals={totals} balanceAnchored={Boolean(settings)} />
+      <SummaryCards
+        totals={totals}
+        balanceAnchored={Boolean(settings)}
+        onEditBalance={!readOnly ? openBalanceEditor : null}
+      />
 
       <ProjectionCard
         available={!store.cloudMode || (recurring.available && settingsAvailable)}
@@ -638,6 +654,9 @@ export default function App() {
         variableEstimate={variableEstimate}
         includeVariable={includeVariable}
         onToggleVariable={setIncludeVariable}
+        adjusting={adjustingBalance}
+        onAdjustingChange={setAdjustingBalance}
+        sectionRef={projectionRef}
       />
 
       <div className="charts-grid">

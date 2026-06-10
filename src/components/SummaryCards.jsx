@@ -1,6 +1,6 @@
 import { formatCents } from '../lib/money.js';
 
-export default function SummaryCards({ totals, balanceAnchored = false }) {
+export default function SummaryCards({ totals, balanceAnchored = false, onEditBalance = null }) {
   const net = totals.net;
   return (
     <div className="summary-grid">
@@ -21,17 +21,31 @@ export default function SummaryCards({ totals, balanceAnchored = false }) {
             ? 'From the starting balance you set, plus activity since'
             : 'Income minus spending recorded so far'
         }
+        action={
+          onEditBalance ? (
+            <button
+              type="button"
+              className="btn icon card-edit"
+              onClick={onEditBalance}
+              aria-label="Edit balance"
+              title="Edit balance"
+            >
+              ✏️
+            </button>
+          ) : null
+        }
       />
     </div>
   );
 }
 
-function Card({ label, value, tone, hint }) {
+function Card({ label, value, tone, hint, action = null }) {
   return (
     <div className={`card summary-card tone-${tone}`}>
       <span className="summary-label">{label}</span>
       <span className="summary-value">{value}</span>
       {hint ? <span className="summary-hint">{hint}</span> : null}
+      {action}
     </div>
   );
 }

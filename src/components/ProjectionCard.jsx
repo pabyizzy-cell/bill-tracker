@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -27,14 +27,26 @@ export default function ProjectionCard({
   variableEstimate,
   includeVariable,
   onToggleVariable,
+  adjusting,
+  onAdjustingChange,
+  sectionRef,
 }) {
   const dailyVariableCents = variableEstimate.dailyCents;
   const today = todayISO();
   const horizon = addDaysISO(today, 92);
   const [lookupDate, setLookupDate] = useState(addDaysISO(today, 30));
-  const [adjusting, setAdjusting] = useState(false);
   const [balanceDraft, setBalanceDraft] = useState('');
   const [balanceError, setBalanceError] = useState('');
+
+  // Prefill with the current balance whenever the editor opens (from the
+  // "adjust" link here or the edit button on the Balance today card).
+  useEffect(() => {
+    if (adjusting) {
+      setBalanceDraft((balanceCents / 100).toFixed(2));
+      setBalanceError('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adjusting]);
 
   const showBalanceForm = canWrite && (!hasStartingBalance || adjusting);
 
@@ -103,18 +115,12 @@ export default function ProjectionCard({
     const ok = await onSaveStartingBalance(negative ? -cents : cents);
     if (ok) {
       setBalanceDraft('');
-      setAdjusting(false);
+      onAdjustingChange(false);
     }
   }
 
-  function startAdjust() {
-    setBalanceDraft((balanceCents / 100).toFixed(2));
-    setBalanceError('');
-    setAdjusting(true);
-  }
-
   return (
-    <section className="card projection-card">
+    <section className="card projection-card" ref={sectionRef}>
       <div className="projection-header">
         <h2>Projected balance · next 3 months</h2>
         <label className="variable-toggle">
@@ -127,7 +133,7 @@ export default function ProjectionCard({
         <span>
           Today: <strong>{formatCents(balanceCents)}</strong>
           {hasStartingBalance && canWrite ? (
-            <button type="button" className="btn link" onClick={adjusting ? () => setAdjusting(false) : startAdjust}>
+            <button type="button" className="btn link" onClick={() => onAdjustingChange(!adjusting)}>
               {adjusting ? 'cancel' : 'adjust'}
             </button>
           ) : null}

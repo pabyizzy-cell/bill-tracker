@@ -78,17 +78,20 @@ export default function RecurringList({ items, available, canWrite, onUpdate, on
 
       {upcoming.length > 0 ? (
         <div className="upcoming-strip">
-          <span className="upcoming-label">Next 7 days:</span>
-          {upcoming.map(({ date, item }, i) => (
-            <span key={`${item.id}-${date}-${i}`} className="upcoming-chip">
-              {getCategory(item.category).emoji} {item.description}{' '}
-              <strong className={item.type === 'income' ? 'income' : 'expense'}>
-                {item.type === 'income' ? '+' : '−'}
-                {formatCents(item.amountCents)}
-              </strong>{' '}
-              {formatDate(date)}
-            </span>
-          ))}
+          <span className="upcoming-label">Next 7 days</span>
+          <div className="upcoming-chips">
+            {upcoming.map(({ date, item }, i) => (
+              <span key={`${item.id}-${date}-${i}`} className="upcoming-chip" title={item.description}>
+                <span className="chip-emoji">{getCategory(item.category).emoji}</span>
+                <span className="chip-desc">{item.description}</span>
+                <strong className={item.type === 'income' ? 'income' : 'expense'}>
+                  {item.type === 'income' ? '+' : '−'}
+                  {formatCents(item.amountCents)}
+                </strong>
+                <span className="chip-date">{formatDate(date)}</span>
+              </span>
+            ))}
+          </div>
         </div>
       ) : null}
 
