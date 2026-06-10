@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { getCategory } from '../data/categories.js';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates.js';
 import { formatCents, parseAmountToCents } from '../lib/money.js';
-import { FREQUENCY_LABELS, nextOccurrence, occurrencesBetween } from '../lib/projection.js';
+import { FREQUENCY_LABELS, occurrencesBetween } from '../lib/projection.js';
+
+const OCCURRENCES_PER_YEAR = { weekly: 52, biweekly: 26, monthly: 12, yearly: 1 };
 
 // The recurring bills/deposits behind the projections. Amount, frequency,
 // and schedule date are editable in place; description/category come from
@@ -160,7 +162,17 @@ export default function RecurringList({
           {sorted.map((item) => {
             const cat = getCategory(item.category);
             const isIncome = item.type === 'income';
-            const next = nextOccurrence(item, todayISO());
+            // Unroll the schedule a little so "every week" visibly reads as
+            // a string of dates, not a single entry.
+            const nextFew = occurrencesBetween(
+              item,
+              addDaysISO(today, 1),
+              addDaysISO(today, 366),
+            ).slice(0, 3);
+            const monthlyEquivalent =
+              item.frequency === 'monthly'
+                ? null
+                : Math.round((item.amountCents * OCCURRENCES_PER_YEAR[item.frequency]) / 12);
             const editing = editingId === item.id;
             return (
               <li key={item.id} className={editing ? 'editing' : ''}>
@@ -209,7 +221,10 @@ export default function RecurringList({
                   ) : (
                     <span className="tx-meta">
                       {FREQUENCY_LABELS[item.frequency]}
-                      {next ? ` · next ${formatDate(next)}` : ''}
+                      {monthlyEquivalent !== null ? ` (≈ ${formatCents(monthlyEquivalent)}/mo)` : ''}
+                      {nextFew.length > 0
+                        ? ` · next ${nextFew.map((d) => formatDate(d)).join(', ')}${nextFew.length === 3 ? ', …' : ''}`
+                        : ''}
                     </span>
                   )}
                 </div>
