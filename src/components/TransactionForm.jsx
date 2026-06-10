@@ -21,15 +21,15 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
     if (!list.some((c) => c.id === category)) setCategory(list[0].id);
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const amountCents = parseAmountToCents(amount);
     if (!description.trim()) return setError('Give it a short description.');
     if (amountCents === null) return setError('Enter an amount greater than zero, like 12.50.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('Pick a date.');
     setError('');
-    onSubmit({ type, description: description.trim(), amountCents, category, date });
-    if (!editingTx) {
+    const ok = await onSubmit({ type, description: description.trim(), amountCents, category, date });
+    if (ok && !editingTx) {
       // Keep type, category, and date so several similar entries can be added quickly.
       setDescription('');
       setAmount('');

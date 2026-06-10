@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import AuthPanel from './components/AuthPanel.jsx';
 import CategoryDonut from './components/CategoryDonut.jsx';
 import MonthPicker from './components/MonthPicker.jsx';
 import SummaryCards from './components/SummaryCards.jsx';
@@ -7,14 +8,15 @@ import TransactionList from './components/TransactionList.jsx';
 import TrendChart from './components/TrendChart.jsx';
 import { getCategory } from './data/categories.js';
 import { generateSampleData } from './data/sampleData.js';
-import { useLocalStorage } from './hooks/useLocalStorage.js';
+import { useAuth } from './hooks/useAuth.js';
+import { useTransactions } from './hooks/useTransactions.js';
 import { currentMonthKey, lastNMonths, monthKeyOf } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
 
-const STORAGE_KEY = 'bill-tracker:transactions:v1';
-
 export default function App() {
-  const [transactions, setTransactions] = useLocalStorage(STORAGE_KEY, []);
+  const { session } = useAuth();
+  const store = useTransactions(session);
+  const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
   const [editingId, setEditingId] = useState(null);
   const formRef = useRef(null);
@@ -76,15 +78,19 @@ export default function App() {
     return keys.map((k) => ({ key: k, ...buckets.get(k) }));
   }, [transactions, month]);
 
-  function addTransaction(tx) {
-    setTransactions((prev) => [{ ...tx, id: crypto.randomUUID() }, ...prev]);
-    setMonth(monthKeyOf(tx.date));
+  async function addTransaction(tx) {
+    const ok = await store.add(tx);
+    if (ok) setMonth(monthKeyOf(tx.date));
+    return ok;
   }
 
-  function saveEdit(tx) {
-    setTransactions((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...tx } : t)));
-    setEditingId(null);
-    setMonth(monthKeyOf(tx.date));
+  async function saveEdit(tx) {
+    const ok = await store.update(editingId, tx);
+    if (ok) {
+      setEditingId(null);
+      setMonth(monthKeyOf(tx.date));
+    }
+    return ok;
   }
 
   function startEdit(id) {
@@ -92,29 +98,31 @@ export default function App() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  function deleteTransaction(id) {
+  async function deleteTransaction(id) {
     const tx = transactions.find((t) => t.id === id);
     if (!tx) return;
     if (!window.confirm(`Delete "${tx.description}" (${formatCents(tx.amountCents)})?`)) return;
     if (editingId === id) setEditingId(null);
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    await store.remove(id);
   }
 
-  function loadSampleData() {
+  async function loadSampleData() {
     if (transactions.length > 0 && !window.confirm('Replace your current data with sample data?')) {
       return;
     }
-    setTransactions(generateSampleData());
-    setMonth(currentMonthKey());
-    setEditingId(null);
+    const ok = await store.replaceAll(generateSampleData());
+    if (ok) {
+      setMonth(currentMonthKey());
+      setEditingId(null);
+    }
   }
 
-  function clearAll() {
+  async function clearAll() {
     if (!window.confirm('Delete ALL transactions? Export a backup first if you want to keep them.')) {
       return;
     }
-    setTransactions([]);
-    setEditingId(null);
+    const ok = await store.replaceAll([]);
+    if (ok) setEditingId(null);
   }
 
   function exportCsv() {
@@ -148,7 +156,7 @@ export default function App() {
     event.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(reader.result);
         const list = Array.isArray(parsed) ? parsed : parsed?.transactions;
@@ -163,7 +171,6 @@ export default function App() {
               /^\d{4}-\d{2}-\d{2}$/.test(t.date ?? ''),
           )
           .map((t) => ({
-            id: typeof t.id === 'string' ? t.id : crypto.randomUUID(),
             type: t.type === 'income' ? 'income' : 'expense',
             category: typeof t.category === 'string' ? t.category : 'other',
             description: t.description,
@@ -174,8 +181,8 @@ export default function App() {
         if (!window.confirm(`Replace your current data with ${cleaned.length} imported transactions?`)) {
           return;
         }
-        setTransactions(cleaned);
-        setEditingId(null);
+        const ok = await store.replaceAll(cleaned);
+        if (ok) setEditingId(null);
       } catch (err) {
         window.alert(`Couldn't import that file: ${err.message}`);
       }
@@ -184,6 +191,8 @@ export default function App() {
   }
 
   const editingTx = transactions.find((t) => t.id === editingId) ?? null;
+  const showImportBanner =
+    store.cloudMode && !store.loading && transactions.length === 0 && store.localCount > 0;
 
   return (
     <div className="app">
@@ -219,6 +228,32 @@ export default function App() {
         </div>
       </header>
 
+      <AuthPanel session={session} />
+
+      {store.error ? (
+        <div className="alert error">
+          <span>{store.error}</span>
+          <button type="button" className="btn link" onClick={store.dismissError}>
+            dismiss
+          </button>
+        </div>
+      ) : null}
+
+      {store.loading ? <div className="alert info">Syncing with your account…</div> : null}
+
+      {showImportBanner ? (
+        <div className="alert banner">
+          <span>
+            This browser has <strong>{store.localCount}</strong>{' '}
+            {store.localCount === 1 ? 'entry' : 'entries'} saved from before you signed in. Move
+            {store.localCount === 1 ? ' it' : ' them'} into your account?
+          </span>
+          <button type="button" className="btn primary" onClick={store.importLocal}>
+            Import into my account
+          </button>
+        </div>
+      ) : null}
+
       <SummaryCards totals={totals} />
 
       <div className="charts-grid">
@@ -246,8 +281,9 @@ export default function App() {
       />
 
       <footer className="app-footer">
-        Your data stays in this browser (localStorage) — nothing is uploaded anywhere. Use Backup /
-        Restore to move it between devices.
+        {store.cloudMode
+          ? 'Synced to your account — your data follows you to any device you sign in on.'
+          : 'Your data stays in this browser (localStorage) — nothing is uploaded anywhere. Use Backup / Restore to move it between devices.'}
       </footer>
     </div>
   );

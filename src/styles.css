@@ -180,6 +180,110 @@ body {
   background: none;
 }
 
+/* ---------- Auth bar & alerts ---------- */
+
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(108, 140, 255, 0.07);
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  font-size: 14px;
+}
+
+.auth-bar.signed-in {
+  background: rgba(52, 211, 153, 0.06);
+  border-color: rgba(52, 211, 153, 0.25);
+}
+
+.auth-status {
+  color: var(--muted);
+}
+
+.auth-status strong {
+  color: var(--text);
+}
+
+.auth-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  margin-right: 6px;
+}
+
+.auth-form {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
+}
+
+.auth-form input {
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  outline: none;
+  flex: 1;
+  min-width: 220px;
+}
+
+.auth-form input:focus {
+  border-color: var(--accent);
+}
+
+.auth-message {
+  margin: 0;
+  width: 100%;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.auth-message.sent {
+  color: var(--green);
+}
+
+.auth-message.error {
+  color: var(--rose);
+}
+
+.alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  font-size: 14px;
+}
+
+.alert.error {
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  color: var(--rose);
+}
+
+.alert.info {
+  background: rgba(108, 140, 255, 0.07);
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  color: var(--muted);
+}
+
+.alert.banner {
+  background: rgba(251, 191, 36, 0.07);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
 /* ---------- Cards ---------- */
 
 .card {
