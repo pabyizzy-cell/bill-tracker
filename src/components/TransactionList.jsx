@@ -4,6 +4,21 @@ import { formatDate, monthLabel } from '../lib/dates.js';
 import { formatCents } from '../lib/money.js';
 import { FREQUENCY_LABELS } from '../lib/projection.js';
 
+const RANGE_OPTIONS = [
+  ['last7', 'Last 7 days'],
+  ['last14', 'Last 14 days'],
+  ['last30', 'Last 30 days'],
+  ['month', 'Month shown above (‹ ›)'],
+  ['all', 'All time'],
+];
+
+const RANGE_TITLES = {
+  last7: 'last 7 days',
+  last14: 'last 14 days',
+  last30: 'last 30 days',
+  all: 'all time',
+};
+
 // Shows one month of transactions — or, when a search query is active,
 // matches from every month. Select mode adds checkboxes for bulk delete /
 // bulk re-categorize.
@@ -11,6 +26,8 @@ export default function TransactionList({
   transactions,
   totalCount = 0,
   month,
+  range = 'last7',
+  onRangeChange,
   searchQuery = '',
   onSearchChange,
   searching = false,
@@ -25,11 +42,11 @@ export default function TransactionList({
 }) {
   const [selected, setSelected] = useState(() => new Set());
 
-  // Different month or query = different rows; stale selections would be
-  // invisible and dangerous to act on.
+  // Different month, range, or query = different rows; stale selections
+  // would be invisible and dangerous to act on.
   useEffect(() => {
     setSelected(new Set());
-  }, [month, searchQuery]);
+  }, [month, searchQuery, range]);
 
   const elsewhere = totalCount - transactions.length;
   const visibleSelected = transactions.filter((t) => selected.has(t.id));
@@ -71,13 +88,13 @@ export default function TransactionList({
         <h2>
           {searching
             ? `Search results`
-            : `Transactions · ${monthLabel(month)}`}
+            : `Transactions · ${range === 'month' ? monthLabel(month) : RANGE_TITLES[range]}`}
         </h2>
         <span className="list-count">
           {searching
             ? `${transactions.length} match${transactions.length === 1 ? '' : 'es'} across all months`
             : `${transactions.length} ${transactions.length === 1 ? 'entry' : 'entries'}` +
-              (elsewhere > 0 ? ` · ${totalCount} total across all months` : '')}
+              (elsewhere > 0 ? ` · ${totalCount} total` : '')}
         </span>
       </div>
 
@@ -91,6 +108,19 @@ export default function TransactionList({
             placeholder="Search all transactions…"
             aria-label="Search transactions"
           />
+          <select
+            className="range-select"
+            value={range}
+            onChange={(e) => onRangeChange(e.target.value)}
+            aria-label="Date range to show"
+            disabled={searching}
+          >
+            {RANGE_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
       ) : null}
 
@@ -166,11 +196,18 @@ export default function TransactionList({
         <div className="empty-state">
           {searching ? (
             <p>No transactions match “{searchQuery}”.</p>
-          ) : (
+          ) : range === 'month' ? (
             <p>
               Nothing recorded for {monthLabel(month)} yet.
               {elsewhere > 0
                 ? ` (${elsewhere} ${elsewhere === 1 ? 'entry lives' : 'entries live'} in other months — use the ‹ › arrows up top.)`
+                : ''}
+            </p>
+          ) : (
+            <p>
+              Nothing in the {RANGE_TITLES[range]}.
+              {elsewhere > 0
+                ? ` (${elsewhere} older ${elsewhere === 1 ? 'entry' : 'entries'} — widen the range or search.)`
                 : ''}
             </p>
           )}

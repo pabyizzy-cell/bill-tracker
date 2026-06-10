@@ -1186,6 +1186,56 @@ body {
   opacity: 0.8;
 }
 
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.collapse-toggle h2 {
+  margin: 0;
+}
+
+.collapse-chevron {
+  color: var(--muted);
+  font-size: 13px;
+  width: 13px;
+}
+
+.section-sub {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  max-width: 70ch;
+}
+
+.range-select {
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  outline: none;
+}
+
+.range-select:focus {
+  border-color: var(--accent);
+}
+
+.range-select:disabled {
+  opacity: 0.5;
+}
+
 .tx-list li:last-child {
   border-bottom: none;
 }

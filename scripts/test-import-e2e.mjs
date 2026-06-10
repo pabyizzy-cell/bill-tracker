@@ -90,10 +90,39 @@ check(
   'projection card is visible with stats',
   await page.locator('.projection-card .projection-stats').isVisible(),
 );
+// The list range may have auto-switched to month mode to reveal the import
+// (rows are older than 7 days); pin it for deterministic assertions.
+await page.locator('.range-select').selectOption('month');
+await page.waitForTimeout(200);
 check(
   'imported transaction is in the list',
   await page.getByText('STARBUCKS STORE 123, SEATTLE').isVisible(),
 );
+
+// Date-range views.
+await page.locator('.range-select').selectOption('all');
+await page.waitForTimeout(200);
+check(
+  'all-time range shows every imported row',
+  (await page.locator('.tx-list li').count()) === 3 &&
+    (await page.getByText('Transactions · all time').isVisible()),
+);
+await page.locator('.range-select').selectOption('month');
+await page.waitForTimeout(200);
+
+// Recurring section: collapsible, auto-opened by the import's recurring
+// item; toggling hides and restores the schedules.
+check('recurring section explains itself when open', await page.locator('.section-sub').isVisible());
+await page.locator('.collapse-toggle').click();
+await page.waitForTimeout(200);
+check(
+  'collapsing hides the schedule list',
+  !(await page.locator('.recurring-list').isVisible()) &&
+    (await page.getByText(/1 schedule/).isVisible()),
+);
+await page.locator('.collapse-toggle').click();
+await page.waitForTimeout(200);
+check('expanding restores the schedule list', await page.locator('.recurring-list').isVisible());
 check(
   'date lookup produces a projected number',
   /\$/.test(await page.locator('.lookup-result strong, .lookup-breakdown').first().innerText()),

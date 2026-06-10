@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getCategory } from '../data/categories.js';
+import { useLocalStorage } from '../hooks/useLocalStorage.js';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates.js';
 import { formatCents, parseAmountToCents } from '../lib/money.js';
 import { FREQUENCY_LABELS, occurrencesBetween } from '../lib/projection.js';
@@ -16,11 +17,19 @@ export default function RecurringList({
   onUpdate,
   onRemove,
   onBulkRemove,
+  revealSignal = 0,
 }) {
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(() => new Set());
+  const [collapsed, setCollapsed] = useLocalStorage('bill-tracker:recurring-collapsed:v1', true);
+
+  // When something new is marked recurring, open the section so the result
+  // is visible — an action that lands in a closed box reads as a failure.
+  useEffect(() => {
+    if (revealSignal > 0) setCollapsed(false);
+  }, [revealSignal, setCollapsed]);
 
   if (!available) return null; // ProjectionCard already shows the migration hint.
 
@@ -104,13 +113,32 @@ export default function RecurringList({
   return (
     <section className="card">
       <div className="list-header">
-        <h2>Recurring bills & deposits</h2>
+        <button
+          type="button"
+          className="collapse-toggle"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-expanded={!collapsed}
+        >
+          <span className="collapse-chevron">{collapsed ? '▸' : '▾'}</span>
+          <h2>Recurring bills & deposits</h2>
+        </button>
         <span className="list-count">
-          {items.length} {items.length === 1 ? 'item' : 'items'}
+          {items.length} {items.length === 1 ? 'schedule' : 'schedules'}
+          {collapsed && upcoming.length > 0
+            ? ` · next: ${upcoming[0].item.description} ${formatDate(upcoming[0].date)}`
+            : ''}
         </span>
       </div>
 
-      {canWrite && items.length > 0 ? (
+      {collapsed ? null : (
+        <>
+          <p className="section-sub">
+            Each row here is a repeating schedule — “rent, every month” — used to project your
+            future balance. It isn't your spending history: real payments still land in
+            Transactions when they happen, and the forecast won't count a bill twice.
+          </p>
+
+          {canWrite && items.length > 0 ? (
         <div className="bulk-bar">
           <label className="bulk-check">
             <input
@@ -276,8 +304,10 @@ export default function RecurringList({
             );
           })}
         </ul>
+          )}
+          {error ? <p className="form-error">{error}</p> : null}
+        </>
       )}
-      {error ? <p className="form-error">{error}</p> : null}
     </section>
   );
 }

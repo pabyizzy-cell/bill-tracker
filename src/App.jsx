@@ -23,7 +23,7 @@ import { useSettings } from './hooks/useSettings.js';
 import { useShares } from './hooks/useShares.js';
 import { useTransactions } from './hooks/useTransactions.js';
 import { mapBankCsv } from './lib/bankImport.js';
-import { currentMonthKey, lastNMonths, monthKeyOf, todayISO } from './lib/dates.js';
+import { addDaysISO, currentMonthKey, lastNMonths, monthKeyOf, todayISO } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
 import {
   FREQUENCY_LABELS,
@@ -32,6 +32,10 @@ import {
 } from './lib/projection.js';
 
 const CONTEXT_KEY = 'bill-tracker:context:v1';
+
+// Date windows the transaction list can show. The month picker up top keeps
+// driving the summary cards and charts either way.
+const RANGE_DAYS = { last7: 7, last14: 14, last30: 30 };
 
 export default function App() {
   const { session } = useAuth();
@@ -83,6 +87,8 @@ export default function App() {
   const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
   const [searchQuery, setSearchQuery] = useState('');
+  const [listRange, setListRange] = useLocalStorage('bill-tracker:list-range:v1', 'last7');
+  const [recurringReveal, setRecurringReveal] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [pendingCsv, setPendingCsv] = useState(null);
   const [csvBusy, setCsvBusy] = useState(false);
@@ -128,6 +134,34 @@ export default function App() {
       )
       .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   }, [transactions, searching, searchQuery]);
+
+  // What the transaction list shows: a recent-days window (default), the
+  // picked month, or everything.
+  const listTransactions = useMemo(() => {
+    if (searching) return searchResults;
+    if (listRange === 'month') return monthTransactions;
+    let rows = transactions;
+    const days = RANGE_DAYS[listRange];
+    if (days) {
+      const today = todayISO();
+      const start = addDaysISO(today, -(days - 1));
+      rows = transactions.filter((t) => t.date >= start && t.date <= today);
+    }
+    return [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  }, [searching, searchResults, listRange, monthTransactions, transactions]);
+
+  // After adding or importing something dated outside the current window,
+  // switch the list to a view that includes it — an action whose result is
+  // invisible reads as a bug.
+  function ensureListShows(date) {
+    setMonth(monthKeyOf(date));
+    const days = RANGE_DAYS[listRange];
+    if (!days) return;
+    const today = todayISO();
+    if (date < addDaysISO(today, -(days - 1)) || date > today) {
+      setListRange('month');
+    }
+  }
 
   const totals = useMemo(() => {
     let income = 0;
@@ -197,7 +231,7 @@ export default function App() {
     }
     const ok = await store.add(fields);
     if (ok) {
-      setMonth(monthKeyOf(tx.date));
+      ensureListShows(tx.date);
       if (repeat && repeat !== 'once') await markRecurring(fields, repeat);
     }
     return ok;
@@ -251,6 +285,7 @@ export default function App() {
         `“${tx.description}” was already recurring — updated it to ${freqLabel}, ${formatCents(tx.amountCents)}, scheduled from ${tx.date}.`,
       );
     }
+    if (added > 0 || updated > 0) setRecurringReveal((n) => n + 1);
   }
 
   async function saveEdit(payload) {
@@ -261,7 +296,7 @@ export default function App() {
       // import) gets promoted to a recurring bill/deposit.
       if (repeat && repeat !== 'once') await markRecurring(tx, repeat);
       setEditingId(null);
-      setMonth(monthKeyOf(tx.date));
+      ensureListShows(tx.date);
     }
     return ok;
   }
@@ -325,6 +360,7 @@ export default function App() {
     setImportNotice(
       `Marked ${ids.length} ${ids.length === 1 ? 'entry' : 'entries'} as repeating (${FREQUENCY_LABELS[frequency].toLowerCase()})${bits.length > 0 ? ` — ${bits.join(', ')}` : ''}. See “Recurring bills & deposits” below.`,
     );
+    if (added > 0 || updated > 0) setRecurringReveal((n) => n + 1);
     return added > 0 || updated > 0;
   }
 
@@ -535,10 +571,11 @@ export default function App() {
     setCsvBusy(false);
 
     const latest = pendingCsv.toAdd.reduce((max, t) => (t.date > max ? t.date : max), '');
-    if (latest) setMonth(monthKeyOf(latest));
+    if (latest) ensureListShows(latest);
     const recurringBits = [];
     if (added > 0) recurringBits.push(`set up ${added} recurring item${added === 1 ? '' : 's'}`);
     if (updated > 0) recurringBits.push(`updated ${updated} existing one${updated === 1 ? '' : 's'}`);
+    if (added > 0 || updated > 0) setRecurringReveal((n) => n + 1);
     setImportNotice(
       `Imported ${pendingCsv.toAdd.length} transaction${pendingCsv.toAdd.length === 1 ? '' : 's'} from your bank file` +
         (recurringBits.length > 0 ? ` and ${recurringBits.join(' and ')}.` : '.'),
@@ -708,9 +745,11 @@ export default function App() {
       )}
 
       <TransactionList
-        transactions={searching ? searchResults : monthTransactions}
+        transactions={listTransactions}
         totalCount={transactions.length}
         month={month}
+        range={listRange}
+        onRangeChange={setListRange}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         searching={searching}
@@ -731,6 +770,7 @@ export default function App() {
         onUpdate={recurring.update}
         onRemove={recurring.remove}
         onBulkRemove={recurring.removeMany}
+        revealSignal={recurringReveal}
       />
 
       {store.cloudMode && ownData ? (
