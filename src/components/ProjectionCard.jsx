@@ -24,10 +24,11 @@ export default function ProjectionCard({
   canWrite,
   recurringItems,
   transactions,
-  dailyVariableCents,
+  variableEstimate,
   includeVariable,
   onToggleVariable,
 }) {
+  const dailyVariableCents = variableEstimate.dailyCents;
   const today = todayISO();
   const horizon = addDaysISO(today, 92);
   const [lookupDate, setLookupDate] = useState(addDaysISO(today, 30));
@@ -197,10 +198,21 @@ export default function ProjectionCard({
         </AreaChart>
       </ResponsiveContainer>
 
+      {dailyVariableCents > 0 ? (
+        <p className="projection-hint">
+          Everyday spending is your own average: {formatCents(variableEstimate.totalCents)} of
+          spending not marked recurring ({variableEstimate.count} transaction
+          {variableEstimate.count === 1 ? '' : 's'}) over the last {variableEstimate.days} days ≈{' '}
+          {formatCents(dailyVariableCents)}/day. Mark regular bills as recurring to keep this number
+          honest, or use the checkbox above to leave it out.
+        </p>
+      ) : null}
+
       {recurringItems.length === 0 ? (
         <p className="projection-hint">
-          No recurring bills or deposits yet — mark transactions as repeating (in the add form or
-          when importing a bank CSV) and the projection will map out your paydays and bills.
+          No recurring bills or deposits yet — mark transactions as repeating (in the add form, when
+          editing one, or when importing a bank CSV) and the projection will map out your paydays
+          and bills.
         </p>
       ) : null}
 

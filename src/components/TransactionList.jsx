@@ -4,6 +4,7 @@ import { formatCents } from '../lib/money.js';
 
 export default function TransactionList({
   transactions,
+  totalCount = 0,
   month,
   editingId,
   onEdit,
@@ -11,18 +12,25 @@ export default function TransactionList({
   onLoadSample,
   canEdit = true,
 }) {
+  const elsewhere = totalCount - transactions.length;
   return (
     <section className="card">
       <div className="list-header">
         <h2>Transactions · {monthLabel(month)}</h2>
         <span className="list-count">
           {transactions.length} {transactions.length === 1 ? 'entry' : 'entries'}
+          {elsewhere > 0 ? ` · ${totalCount} total across all months` : ''}
         </span>
       </div>
 
       {transactions.length === 0 ? (
         <div className="empty-state">
-          <p>Nothing recorded for {monthLabel(month)} yet.</p>
+          <p>
+            Nothing recorded for {monthLabel(month)} yet.
+            {elsewhere > 0
+              ? ` (${elsewhere} ${elsewhere === 1 ? 'entry lives' : 'entries live'} in other months — use the ‹ › arrows up top.)`
+              : ''}
+          </p>
           {onLoadSample ? (
             <>
               <p className="empty-sub">

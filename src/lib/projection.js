@@ -80,8 +80,9 @@ export function currentBalanceCents(transactions, settings, todayISO) {
 
 // Average daily "everyday" spending over the recent past: expenses that
 // don't belong to a recurring item (matched by description), divided by the
-// days of history actually available (up to lookbackDays).
-export function estimateDailyVariableSpendCents(
+// days of history actually available (up to lookbackDays). Returns the
+// inputs too so the UI can show where the number comes from.
+export function estimateDailyVariableSpend(
   transactions,
   recurringItems,
   todayISO,
@@ -91,18 +92,26 @@ export function estimateDailyVariableSpendCents(
   const recurringDescs = new Set(
     recurringItems.map((r) => r.description.trim().toLowerCase()),
   );
-  let sum = 0;
+  let totalCents = 0;
+  let count = 0;
   let earliest = null;
   for (const t of transactions) {
     if (t.date > todayISO || t.date < windowStart) continue;
     if (earliest === null || t.date < earliest) earliest = t.date;
     if (t.type !== 'expense') continue;
     if (recurringDescs.has(t.description.trim().toLowerCase())) continue;
-    sum += t.amountCents;
+    totalCents += t.amountCents;
+    count++;
   }
-  if (earliest === null || sum <= 0) return 0;
-  const coveredDays = Math.max(diffDaysISO(earliest, todayISO) + 1, 1);
-  return Math.round(sum / coveredDays);
+  if (earliest === null || totalCents <= 0) {
+    return { dailyCents: 0, totalCents: 0, count: 0, days: 0 };
+  }
+  const days = Math.max(diffDaysISO(earliest, todayISO) + 1, 1);
+  return { dailyCents: Math.round(totalCents / days), totalCents, count, days };
+}
+
+export function estimateDailyVariableSpendCents(transactions, recurringItems, todayISO, lookbackDays = 90) {
+  return estimateDailyVariableSpend(transactions, recurringItems, todayISO, lookbackDays).dailyCents;
 }
 
 // Walks day by day from the day after fromISO through toISO.

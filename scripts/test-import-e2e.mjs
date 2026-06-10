@@ -79,6 +79,23 @@ check(
   'date lookup produces a projected number',
   /\$/.test(await page.locator('.lookup-result strong, .lookup-breakdown').first().innerText()),
 );
+
+// Re-marking an already-recurring bill via edit must UPDATE the existing
+// item (this used to be silently dropped, and the user saw nothing happen).
+await page.locator('.tx-list').getByRole('button', { name: 'Edit NETFLIX.COM' }).click();
+await page.locator('.form-grid select').last().selectOption('weekly');
+await page.getByRole('button', { name: 'Save changes' }).click();
+await page.waitForTimeout(300);
+check(
+  'remarking via edit shows a confirmation notice',
+  await page.getByText(/was already recurring — updated it to every week/).isVisible(),
+);
+const netflixRows = page.locator('.recurring-list li', { hasText: 'NETFLIX.COM' });
+check('no duplicate recurring item is created', (await netflixRows.count()) === 1);
+check(
+  'the existing recurring item took the new frequency',
+  await netflixRows.locator('.tx-meta', { hasText: 'Every week' }).isVisible(),
+);
 check(
   'summary cards include imported spending',
   (await page.locator('.summary-value').first().innerText()) !== undefined,

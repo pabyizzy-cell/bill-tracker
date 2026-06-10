@@ -2,6 +2,7 @@
 import {
   buildProjection,
   currentBalanceCents,
+  estimateDailyVariableSpend,
   estimateDailyVariableSpendCents,
   nextOccurrence,
   occurrencesBetween,
@@ -74,6 +75,11 @@ check(
   1000, // (9000 + 1000) / 10 days of history
 );
 check('variable estimate is 0 with no history', estimateDailyVariableSpendCents([], [rent], '2026-06-10'), 0);
+check(
+  'variable estimate explains its inputs',
+  estimateDailyVariableSpend(history, [rent], '2026-06-10'),
+  { dailyCents: 1000, totalCents: 10000, count: 2, days: 10 },
+);
 
 // --- full projection ---
 const proj = buildProjection({

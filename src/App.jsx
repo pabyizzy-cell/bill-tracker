@@ -25,7 +25,11 @@ import { useTransactions } from './hooks/useTransactions.js';
 import { mapBankCsv } from './lib/bankImport.js';
 import { currentMonthKey, lastNMonths, monthKeyOf, todayISO } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
-import { currentBalanceCents, estimateDailyVariableSpendCents } from './lib/projection.js';
+import {
+  FREQUENCY_LABELS,
+  currentBalanceCents,
+  estimateDailyVariableSpend,
+} from './lib/projection.js';
 
 const CONTEXT_KEY = 'bill-tracker:context:v1';
 
@@ -108,8 +112,8 @@ export default function App() {
     return { income, spending, net: income - spending, balance };
   }, [transactions, monthTransactions, settings]);
 
-  const dailyVariableCents = useMemo(
-    () => estimateDailyVariableSpendCents(transactions, recurring.items, todayISO()),
+  const variableEstimate = useMemo(
+    () => estimateDailyVariableSpend(transactions, recurring.items, todayISO()),
     [transactions, recurring.items],
   );
 
@@ -152,35 +156,59 @@ export default function App() {
     const ok = await store.add(fields);
     if (ok) {
       setMonth(monthKeyOf(tx.date));
-      if (repeat && repeat !== 'once') {
-        await addRecurringIfNew([
-          {
-            type: fields.type,
-            description: fields.description,
-            amountCents: fields.amountCents,
-            category: fields.category,
-            frequency: repeat,
-            anchorDate: fields.date,
-          },
-        ]);
-      }
+      if (repeat && repeat !== 'once') await markRecurring(fields, repeat);
     }
     return ok;
   }
 
-  // Adds recurring items, skipping any whose description is already tracked.
-  async function addRecurringIfNew(candidates) {
-    const existing = new Set(recurring.items.map((r) => r.description.trim().toLowerCase()));
-    const fresh = [];
+  // Creates or refreshes recurring items. When the description is already
+  // tracked, the existing item takes on the new amount/frequency/schedule —
+  // never silently dropped.
+  async function upsertRecurring(candidates) {
+    const byDesc = new Map(
+      recurring.items.map((r) => [r.description.trim().toLowerCase(), r]),
+    );
+    const toAdd = [];
+    let updated = 0;
     for (const c of candidates) {
-      const key = c.description.trim().toLowerCase();
-      if (existing.has(key)) continue;
-      existing.add(key);
-      fresh.push(c);
+      const existing = byDesc.get(c.description.trim().toLowerCase());
+      if (existing) {
+        const ok = await recurring.update(existing.id, {
+          amountCents: c.amountCents,
+          frequency: c.frequency,
+          anchorDate: c.anchorDate,
+        });
+        if (ok) updated++;
+      } else {
+        toAdd.push(c);
+      }
     }
-    if (fresh.length === 0) return 0;
-    const ok = await recurring.addMany(fresh);
-    return ok ? fresh.length : 0;
+    const added = toAdd.length > 0 && (await recurring.addMany(toAdd)) ? toAdd.length : 0;
+    return { added, updated };
+  }
+
+  // Single transaction marked as repeating (from the add or edit form).
+  async function markRecurring(tx, frequency) {
+    const { added, updated } = await upsertRecurring([
+      {
+        type: tx.type,
+        description: tx.description,
+        amountCents: tx.amountCents,
+        category: tx.category,
+        frequency,
+        anchorDate: tx.date,
+      },
+    ]);
+    const freqLabel = FREQUENCY_LABELS[frequency].toLowerCase();
+    if (added > 0) {
+      setImportNotice(
+        `“${tx.description}” is now recurring (${freqLabel}) — see “Recurring bills & deposits” below.`,
+      );
+    } else if (updated > 0) {
+      setImportNotice(
+        `“${tx.description}” was already recurring — updated it to ${freqLabel}, ${formatCents(tx.amountCents)}, scheduled from ${tx.date}.`,
+      );
+    }
   }
 
   async function saveEdit(payload) {
@@ -189,18 +217,7 @@ export default function App() {
     if (ok) {
       // Editing is also how an existing entry (e.g. from an earlier CSV
       // import) gets promoted to a recurring bill/deposit.
-      if (repeat && repeat !== 'once') {
-        await addRecurringIfNew([
-          {
-            type: tx.type,
-            description: tx.description,
-            amountCents: tx.amountCents,
-            category: tx.category,
-            frequency: repeat,
-            anchorDate: tx.date,
-          },
-        ]);
-      }
+      if (repeat && repeat !== 'once') await markRecurring(tx, repeat);
       setEditingId(null);
       setMonth(monthKeyOf(tx.date));
     }
@@ -374,16 +391,17 @@ export default function App() {
         });
       }
     });
-    const addedRecurring = await addRecurringIfNew([...byDescription.values()]);
+    const { added, updated } = await upsertRecurring([...byDescription.values()]);
     setCsvBusy(false);
 
     const latest = pendingCsv.toAdd.reduce((max, t) => (t.date > max ? t.date : max), '');
     if (latest) setMonth(monthKeyOf(latest));
+    const recurringBits = [];
+    if (added > 0) recurringBits.push(`set up ${added} recurring item${added === 1 ? '' : 's'}`);
+    if (updated > 0) recurringBits.push(`updated ${updated} existing one${updated === 1 ? '' : 's'}`);
     setImportNotice(
       `Imported ${pendingCsv.toAdd.length} transaction${pendingCsv.toAdd.length === 1 ? '' : 's'} from your bank file` +
-        (addedRecurring > 0
-          ? ` and set up ${addedRecurring} recurring item${addedRecurring === 1 ? '' : 's'}.`
-          : '.'),
+        (recurringBits.length > 0 ? ` and ${recurringBits.join(' and ')}.` : '.'),
     );
     setPendingCsv(null);
   }
@@ -429,7 +447,7 @@ export default function App() {
                 type="button"
                 className="btn ghost danger"
                 onClick={clearAll}
-                disabled={!transactions.length}
+                disabled={!transactions.length && !recurring.items.length && !settings}
               >
                 Clear
               </button>
@@ -520,7 +538,7 @@ export default function App() {
         canWrite={!readOnly}
         recurringItems={recurring.items}
         transactions={transactions}
-        dailyVariableCents={dailyVariableCents}
+        variableEstimate={variableEstimate}
         includeVariable={includeVariable}
         onToggleVariable={setIncludeVariable}
       />
@@ -544,6 +562,7 @@ export default function App() {
 
       <TransactionList
         transactions={monthTransactions}
+        totalCount={transactions.length}
         month={month}
         editingId={editingId}
         onEdit={startEdit}
