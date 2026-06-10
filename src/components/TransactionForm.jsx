@@ -11,6 +11,7 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
   );
   const [category, setCategory] = useState(editingTx?.category ?? 'groceries');
   const [date, setDate] = useState(editingTx?.date ?? todayISO());
+  const [repeat, setRepeat] = useState('once');
   const [error, setError] = useState('');
 
   const categories = categoriesFor(type);
@@ -28,11 +29,19 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
     if (amountCents === null) return setError('Enter an amount greater than zero, like 12.50.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('Pick a date.');
     setError('');
-    const ok = await onSubmit({ type, description: description.trim(), amountCents, category, date });
+    const ok = await onSubmit({
+      type,
+      description: description.trim(),
+      amountCents,
+      category,
+      date,
+      repeat: editingTx ? 'once' : repeat,
+    });
     if (ok && !editingTx) {
       // Keep type, category, and date so several similar entries can be added quickly.
       setDescription('');
       setAmount('');
+      setRepeat('once');
     }
   }
 
@@ -87,6 +96,18 @@ export default function TransactionForm({ editingTx, onSubmit, onCancel }) {
           Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
+        {!editingTx ? (
+          <label>
+            Repeats
+            <select value={repeat} onChange={(e) => setRepeat(e.target.value)}>
+              <option value="once">One-time</option>
+              <option value="weekly">Every week</option>
+              <option value="biweekly">Every 2 weeks</option>
+              <option value="monthly">Every month</option>
+              <option value="yearly">Every year</option>
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {error ? <p className="form-error">{error}</p> : null}

@@ -3,19 +3,29 @@ import AuthPanel from './components/AuthPanel.jsx';
 import CategoryDonut from './components/CategoryDonut.jsx';
 import CsvImportBanner from './components/CsvImportBanner.jsx';
 import MonthPicker from './components/MonthPicker.jsx';
+import ProjectionCard from './components/ProjectionCard.jsx';
+import RecurringList from './components/RecurringList.jsx';
 import SharingPanel from './components/SharingPanel.jsx';
 import SummaryCards from './components/SummaryCards.jsx';
 import TransactionForm from './components/TransactionForm.jsx';
 import TransactionList from './components/TransactionList.jsx';
 import TrendChart from './components/TrendChart.jsx';
 import { getCategory } from './data/categories.js';
-import { generateSampleData } from './data/sampleData.js';
+import {
+  SAMPLE_STARTING_BALANCE_CENTS,
+  generateSampleData,
+  generateSampleRecurring,
+} from './data/sampleData.js';
 import { useAuth } from './hooks/useAuth.js';
+import { useLocalStorage } from './hooks/useLocalStorage.js';
+import { useRecurring } from './hooks/useRecurring.js';
+import { useSettings } from './hooks/useSettings.js';
 import { useShares } from './hooks/useShares.js';
 import { useTransactions } from './hooks/useTransactions.js';
 import { mapBankCsv } from './lib/bankImport.js';
-import { currentMonthKey, lastNMonths, monthKeyOf } from './lib/dates.js';
+import { currentMonthKey, lastNMonths, monthKeyOf, todayISO } from './lib/dates.js';
 import { formatCents } from './lib/money.js';
+import { currentBalanceCents, estimateDailyVariableSpendCents } from './lib/projection.js';
 
 const CONTEXT_KEY = 'bill-tracker:context:v1';
 
@@ -59,6 +69,13 @@ export default function App() {
   }
 
   const store = useTransactions(session, context);
+  const recurring = useRecurring(session, context);
+  const { settings, available: settingsAvailable, saveStartingBalance, clear: clearSettings } =
+    useSettings(session, context);
+  const [includeVariable, setIncludeVariable] = useLocalStorage(
+    'bill-tracker:projection-variable:v1',
+    true,
+  );
   const { transactions } = store;
   const [month, setMonth] = useState(currentMonthKey());
   const [editingId, setEditingId] = useState(null);
@@ -87,12 +104,14 @@ export default function App() {
       if (t.type === 'income') income += t.amountCents;
       else spending += t.amountCents;
     }
-    let balance = 0;
-    for (const t of transactions) {
-      balance += t.type === 'income' ? t.amountCents : -t.amountCents;
-    }
+    const balance = currentBalanceCents(transactions, settings, todayISO());
     return { income, spending, net: income - spending, balance };
-  }, [transactions, monthTransactions]);
+  }, [transactions, monthTransactions, settings]);
+
+  const dailyVariableCents = useMemo(
+    () => estimateDailyVariableSpendCents(transactions, recurring.items, todayISO()),
+    [transactions, recurring.items],
+  );
 
   const byCategory = useMemo(() => {
     const sums = new Map();
@@ -129,12 +148,43 @@ export default function App() {
   }, [transactions, month]);
 
   async function addTransaction(tx) {
-    const ok = await store.add(tx);
-    if (ok) setMonth(monthKeyOf(tx.date));
+    const { repeat, ...fields } = tx;
+    const ok = await store.add(fields);
+    if (ok) {
+      setMonth(monthKeyOf(tx.date));
+      if (repeat && repeat !== 'once') {
+        await addRecurringIfNew([
+          {
+            type: fields.type,
+            description: fields.description,
+            amountCents: fields.amountCents,
+            category: fields.category,
+            frequency: repeat,
+            anchorDate: fields.date,
+          },
+        ]);
+      }
+    }
     return ok;
   }
 
-  async function saveEdit(tx) {
+  // Adds recurring items, skipping any whose description is already tracked.
+  async function addRecurringIfNew(candidates) {
+    const existing = new Set(recurring.items.map((r) => r.description.trim().toLowerCase()));
+    const fresh = [];
+    for (const c of candidates) {
+      const key = c.description.trim().toLowerCase();
+      if (existing.has(key)) continue;
+      existing.add(key);
+      fresh.push(c);
+    }
+    if (fresh.length === 0) return 0;
+    const ok = await recurring.addMany(fresh);
+    return ok ? fresh.length : 0;
+  }
+
+  async function saveEdit(payload) {
+    const { repeat: _ignored, ...tx } = payload;
     const ok = await store.update(editingId, tx);
     if (ok) {
       setEditingId(null);
@@ -162,17 +212,27 @@ export default function App() {
     }
     const ok = await store.replaceAll(generateSampleData());
     if (ok) {
+      await recurring.replaceAll(generateSampleRecurring());
+      await saveStartingBalance(SAMPLE_STARTING_BALANCE_CENTS);
       setMonth(currentMonthKey());
       setEditingId(null);
     }
   }
 
   async function clearAll() {
-    if (!window.confirm('Delete ALL transactions? Export a backup first if you want to keep them.')) {
+    if (
+      !window.confirm(
+        'Delete ALL transactions, recurring items, and your starting balance? Export a backup first if you want to keep them.',
+      )
+    ) {
       return;
     }
     const ok = await store.replaceAll([]);
-    if (ok) setEditingId(null);
+    if (ok) {
+      await recurring.replaceAll([]);
+      await clearSettings();
+      setEditingId(null);
+    }
   }
 
   function exportCsv() {
@@ -272,16 +332,44 @@ export default function App() {
     reader.readAsText(file);
   }
 
-  async function confirmCsvImport() {
+  async function confirmCsvImport(recurrenceChoices) {
     if (!pendingCsv) return;
     setCsvBusy(true);
     const ok = await store.addMany(pendingCsv.toAdd);
+    if (!ok) {
+      setCsvBusy(false);
+      return;
+    }
+
+    // Rows marked as repeating become recurring items. When the same bill
+    // is marked in several months, keep the most recent one as the schedule.
+    const byDescription = new Map();
+    pendingCsv.toAdd.forEach((t, i) => {
+      const freq = recurrenceChoices[i];
+      if (!freq || freq === 'once') return;
+      const key = t.description.trim().toLowerCase();
+      const prev = byDescription.get(key);
+      if (!prev || t.date > prev.anchorDate) {
+        byDescription.set(key, {
+          type: t.type,
+          description: t.description,
+          amountCents: t.amountCents,
+          category: t.category,
+          frequency: freq,
+          anchorDate: t.date,
+        });
+      }
+    });
+    const addedRecurring = await addRecurringIfNew([...byDescription.values()]);
     setCsvBusy(false);
-    if (!ok) return;
+
     const latest = pendingCsv.toAdd.reduce((max, t) => (t.date > max ? t.date : max), '');
     if (latest) setMonth(monthKeyOf(latest));
     setImportNotice(
-      `Imported ${pendingCsv.toAdd.length} transaction${pendingCsv.toAdd.length === 1 ? '' : 's'} from your bank file.`,
+      `Imported ${pendingCsv.toAdd.length} transaction${pendingCsv.toAdd.length === 1 ? '' : 's'} from your bank file` +
+        (addedRecurring > 0
+          ? ` and set up ${addedRecurring} recurring item${addedRecurring === 1 ? '' : 's'}.`
+          : '.'),
     );
     setPendingCsv(null);
   }
@@ -359,6 +447,15 @@ export default function App() {
         </div>
       ) : null}
 
+      {recurring.error ? (
+        <div className="alert error">
+          <span>{recurring.error}</span>
+          <button type="button" className="btn link" onClick={recurring.dismissError}>
+            dismiss
+          </button>
+        </div>
+      ) : null}
+
       {store.loading ? <div className="alert info">Syncing…</div> : null}
 
       {!ownData ? (
@@ -399,7 +496,20 @@ export default function App() {
         </div>
       ) : null}
 
-      <SummaryCards totals={totals} />
+      <SummaryCards totals={totals} balanceAnchored={Boolean(settings)} />
+
+      <ProjectionCard
+        available={!store.cloudMode || (recurring.available && settingsAvailable)}
+        balanceCents={totals.balance}
+        hasStartingBalance={Boolean(settings)}
+        onSaveStartingBalance={saveStartingBalance}
+        canWrite={!readOnly}
+        recurringItems={recurring.items}
+        transactions={transactions}
+        dailyVariableCents={dailyVariableCents}
+        includeVariable={includeVariable}
+        onToggleVariable={setIncludeVariable}
+      />
 
       <div className="charts-grid">
         <CategoryDonut data={byCategory} totalCents={totals.spending} />
@@ -426,6 +536,14 @@ export default function App() {
         onDelete={deleteTransaction}
         onLoadSample={ownData && transactions.length === 0 ? loadSampleData : null}
         canEdit={!readOnly}
+      />
+
+      <RecurringList
+        items={recurring.items}
+        available={!store.cloudMode || recurring.available}
+        canWrite={!readOnly}
+        onUpdate={recurring.update}
+        onRemove={recurring.remove}
       />
 
       {store.cloudMode && ownData ? (

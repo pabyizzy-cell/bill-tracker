@@ -311,6 +311,208 @@ body {
   border-color: var(--accent);
 }
 
+/* ---------- Projection card ---------- */
+
+.projection-card {
+  border-color: rgba(108, 140, 255, 0.3);
+}
+
+.projection-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.variable-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.variable-toggle input {
+  accent-color: var(--accent);
+}
+
+.projection-stats {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin: 2px 0 14px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.projection-stats strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.projection-stats strong.pos {
+  color: var(--green);
+}
+
+.projection-stats strong.neg,
+.lookup-result strong.neg {
+  color: var(--rose);
+}
+
+.balance-setup {
+  background: rgba(251, 191, 36, 0.07);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.balance-setup-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.balance-setup input {
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  outline: none;
+  flex: 1;
+  min-width: 200px;
+}
+
+.balance-setup input:focus {
+  border-color: var(--accent);
+}
+
+.projection-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.lookup-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(34, 48, 74, 0.6);
+}
+
+.lookup-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.lookup-row input {
+  font: inherit;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  outline: none;
+}
+
+.lookup-row input:focus {
+  border-color: var(--accent);
+}
+
+.lookup-result {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lookup-result strong {
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  color: var(--green);
+}
+
+.lookup-breakdown {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.tooltip-event {
+  font-size: 12.5px;
+  margin-top: 2px;
+}
+
+.tooltip-event.muted {
+  color: var(--muted);
+}
+
+/* ---------- Recurring list ---------- */
+
+.recurring-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recurring-list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 6px;
+  border-bottom: 1px solid rgba(34, 48, 74, 0.6);
+  border-radius: 10px;
+}
+
+.recurring-list li:last-child {
+  border-bottom: none;
+}
+
+.recurring-list li.editing {
+  background: rgba(108, 140, 255, 0.08);
+  border: 1px solid rgba(108, 140, 255, 0.35);
+}
+
+.recurring-edit {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.recurring-edit input,
+.recurring-edit select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  outline: none;
+}
+
+.recurring-edit input:first-child {
+  width: 110px;
+}
+
 /* ---------- CSV import review ---------- */
 
 .import-card {
@@ -340,14 +542,36 @@ body {
   flex-direction: column;
 }
 
+.import-preview.scrollable {
+  max-height: 340px;
+  overflow-y: auto;
+  padding-right: 6px;
+  margin-bottom: 14px;
+}
+
 .import-preview li {
   display: grid;
-  grid-template-columns: 110px 1fr auto auto;
+  grid-template-columns: 110px 1fr auto auto auto;
   gap: 12px;
   align-items: center;
   padding: 8px 4px;
   border-bottom: 1px solid rgba(34, 48, 74, 0.6);
   font-size: 13.5px;
+}
+
+.import-repeat {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: rgba(11, 17, 32, 0.6);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  outline: none;
+}
+
+.import-repeat:focus {
+  border-color: var(--accent);
 }
 
 .import-preview li:last-child {
@@ -379,7 +603,7 @@ body {
 
 @media (max-width: 560px) {
   .import-preview li {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
   }
 
   .import-date,
@@ -721,7 +945,7 @@ body {
 
 .form-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.4fr 1.1fr;
+  grid-template-columns: 2fr 1fr 1.4fr 1.1fr 1.1fr;
   gap: 12px;
 }
 

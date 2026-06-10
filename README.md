@@ -13,6 +13,12 @@ charts — no account, no server, no data leaving your browser.
 - **See where it goes** — a donut chart and ranked category breakdown show
   exactly what ate your budget each month.
 - **Spot trends** — income vs. spending compared across the last six months.
+- **See your future balance** — mark transactions as recurring (in the add
+  form or the CSV review screen) and an always-visible chart projects your
+  balance day-by-day across the next 3 months, flagging the lowest dip. A
+  date picker answers "what will I have on date X?", and a toggle includes
+  or excludes your estimated everyday spending. Set your real bank balance
+  once so the numbers are anchored to reality.
 - **Monthly summaries** — income, spending, net, and your all-time balance
   at a glance. Flip between months with the month picker.
 - **16 built-in categories** with emoji and color coding (housing, groceries,
@@ -82,6 +88,13 @@ When cloud sync is configured but you're signed out, the app keeps working
 in local mode; after signing in it offers to import anything you'd entered
 locally. The single-file build stays local-only (magic links can't redirect
 to a `file://` page).
+
+### Database updates (migrations)
+
+Run each file in `supabase/migrations/` once, in order, via the SQL Editor:
+`0001` creates the transactions table, `0002` enables sharing, and `0003`
+adds recurring items and the starting balance used by projections. The app
+tells you (instead of breaking) when a migration it needs hasn't run yet.
 
 ### Sharing your data with other people
 

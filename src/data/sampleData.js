@@ -12,6 +12,26 @@ function mulberry32(seed) {
   };
 }
 
+export const SAMPLE_STARTING_BALANCE_CENTS = 340000;
+
+// Schedules matching the sample transactions, so the projection chart has
+// something real to show.
+export function generateSampleRecurring() {
+  const end = currentMonthKey();
+  const day = (d) => `${end}-${String(d).padStart(2, '0')}`;
+  return [
+    { type: 'income', description: 'Paycheck', amountCents: 265000, category: 'salary', frequency: 'monthly', anchorDate: day(1) },
+    { type: 'income', description: 'Paycheck', amountCents: 265000, category: 'salary', frequency: 'monthly', anchorDate: day(15) },
+    { type: 'expense', description: 'Rent', amountCents: 145000, category: 'housing', frequency: 'monthly', anchorDate: day(1) },
+    { type: 'expense', description: 'Electric & water', amountCents: 12500, category: 'utilities', frequency: 'monthly', anchorDate: day(5) },
+    { type: 'expense', description: 'Internet', amountCents: 6500, category: 'utilities', frequency: 'monthly', anchorDate: day(9) },
+    { type: 'expense', description: 'Streaming bundle', amountCents: 2400, category: 'subscriptions', frequency: 'monthly', anchorDate: day(3) },
+    { type: 'expense', description: 'Cloud photo storage', amountCents: 1100, category: 'subscriptions', frequency: 'monthly', anchorDate: day(11) },
+    { type: 'expense', description: 'Gym membership', amountCents: 4200, category: 'subscriptions', frequency: 'monthly', anchorDate: day(17) },
+    { type: 'expense', description: 'Transfer to savings', amountCents: 30000, category: 'savings', frequency: 'monthly', anchorDate: day(25) },
+  ];
+}
+
 export function generateSampleData() {
   const rand = mulberry32(987654321);
   const between = (min, max) => Math.round(min + (max - min) * rand());

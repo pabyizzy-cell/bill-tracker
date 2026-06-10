@@ -1,16 +1,19 @@
+import { useState } from 'react';
 import { getCategory } from '../data/categories.js';
 import { formatDate } from '../lib/dates.js';
 import { formatCents } from '../lib/money.js';
 
-const PREVIEW_COUNT = 6;
-
-// Review step for a parsed bank CSV: shows what will be added and what's
-// being skipped, and waits for explicit confirmation before saving anything.
+// Review step for a parsed bank CSV. Every row gets a dropdown to mark it as
+// a one-time transaction or a recurring bill/deposit; nothing is saved until
+// the user confirms. onConfirm receives the recurrence choice per row.
 export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) {
   const { format, toAdd, duplicates, skippedTransfers, skippedUnreadable } = pending;
+  const [choices, setChoices] = useState(() => toAdd.map(() => 'once'));
+
   const expenses = toAdd.filter((t) => t.type === 'expense').length;
   const income = toAdd.length - expenses;
   const dates = toAdd.map((t) => t.date).sort();
+  const recurringCount = choices.filter((c) => c !== 'once').length;
 
   const skippedBits = [];
   if (skippedTransfers > 0) {
@@ -21,6 +24,10 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
   if (duplicates > 0) skippedBits.push(`${duplicates} already in your data`);
   if (skippedUnreadable > 0) {
     skippedBits.push(`${skippedUnreadable} unreadable row${skippedUnreadable === 1 ? '' : 's'}`);
+  }
+
+  function setChoice(index, value) {
+    setChoices((prev) => prev.map((c, i) => (i === index ? value : c)));
   }
 
   return (
@@ -34,12 +41,16 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
       {skippedBits.length > 0 ? (
         <p className="import-skips">Not importing: {skippedBits.join(' · ')}.</p>
       ) : null}
+      <p className="import-skips">
+        Mark anything that repeats — rent, paychecks, subscriptions — and it will also power your
+        balance projections.
+      </p>
 
-      <ul className="import-preview">
-        {toAdd.slice(0, PREVIEW_COUNT).map((t, i) => {
+      <ul className="import-preview scrollable">
+        {toAdd.map((t, i) => {
           const cat = getCategory(t.category);
           return (
-            // Index keys are fine here: the list is static until confirmed/cancelled.
+            // Index keys are safe: the list never reorders while visible.
             <li key={i}>
               <span className="import-date">{formatDate(t.date)}</span>
               <span className="import-desc">{t.description}</span>
@@ -50,17 +61,32 @@ export default function CsvImportBanner({ pending, busy, onConfirm, onCancel }) 
                 {t.type === 'income' ? '+' : '−'}
                 {formatCents(t.amountCents)}
               </span>
+              <select
+                className="import-repeat"
+                value={choices[i]}
+                onChange={(e) => setChoice(i, e.target.value)}
+                aria-label={`Recurrence for ${t.description}`}
+              >
+                <option value="once">One-time</option>
+                <option value="weekly">Every week</option>
+                <option value="biweekly">Every 2 weeks</option>
+                <option value="monthly">Every month</option>
+                <option value="yearly">Every year</option>
+              </select>
             </li>
           );
         })}
       </ul>
-      {toAdd.length > PREVIEW_COUNT ? (
-        <p className="import-more">…and {toAdd.length - PREVIEW_COUNT} more.</p>
-      ) : null}
 
       <div className="form-actions">
-        <button type="button" className="btn primary" onClick={onConfirm} disabled={busy}>
-          {busy ? 'Importing…' : `Add ${toAdd.length} transaction${toAdd.length === 1 ? '' : 's'}`}
+        <button type="button" className="btn primary" onClick={() => onConfirm(choices)} disabled={busy}>
+          {busy
+            ? 'Importing…'
+            : `Add ${toAdd.length} transaction${toAdd.length === 1 ? '' : 's'}${
+                recurringCount > 0
+                  ? ` + ${recurringCount} recurring item${recurringCount === 1 ? '' : 's'}`
+                  : ''
+              }`}
         </button>
         <button type="button" className="btn ghost" onClick={onCancel} disabled={busy}>
           Cancel

@@ -1,6 +1,6 @@
 import { formatCents } from '../lib/money.js';
 
-export default function SummaryCards({ totals }) {
+export default function SummaryCards({ totals, balanceAnchored = false }) {
   const net = totals.net;
   return (
     <div className="summary-grid">
@@ -13,10 +13,14 @@ export default function SummaryCards({ totals }) {
         hint={net < 0 ? 'You spent more than you brought in' : 'You came out ahead'}
       />
       <Card
-        label="All-time balance"
+        label="Balance today"
         value={formatCents(totals.balance)}
         tone="accent"
-        hint="Income minus spending, across every month tracked"
+        hint={
+          balanceAnchored
+            ? 'From the starting balance you set, plus activity since'
+            : 'Income minus spending recorded so far'
+        }
       />
     </div>
   );

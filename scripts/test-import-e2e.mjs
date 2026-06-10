@@ -12,6 +12,7 @@ const csv = [
   'Transaction Date,Post Date,Description,Category,Type,Amount,Memo',
   '06/02/2026,06/03/2026,"STARBUCKS STORE 123, SEATTLE",Food & Drink,Sale,-7.45,',
   '06/01/2026,06/02/2026,WHOLEFDS MKT 10259,Groceries,Sale,-84.20,',
+  '06/01/2026,06/02/2026,NETFLIX.COM,Bills & Utilities,Sale,-15.49,',
   '05/27/2026,05/28/2026,Payment Thank You-Mobile,,Payment,500.00,',
 ].join('\r\n');
 
@@ -40,17 +41,43 @@ await page.setInputFiles('input[type="file"][accept*="csv"]', csvPath);
 const banner = page.locator('.import-card');
 await banner.waitFor({ timeout: 5000 });
 const summary = await banner.locator('.import-summary').innerText();
-check('review shows 2 new transactions', summary.includes('2') && summary.includes('expenses'));
-const skips = await banner.locator('.import-skips').innerText();
+check('review shows 3 new transactions', summary.includes('3') && summary.includes('expenses'));
+const skips = await banner.locator('.import-skips').first().innerText();
 check('review notes the skipped card payment', /1 card payment/.test(skips));
 
-await banner.getByRole('button', { name: /Add 2 transactions/ }).click();
+// Mark the Netflix row as a monthly recurring bill.
+await banner
+  .locator('select[aria-label="Recurrence for NETFLIX.COM"]')
+  .selectOption('monthly');
+const confirmLabel = await banner.getByRole('button', { name: /^Add 3/ }).innerText();
+check('confirm button reflects the recurring choice', /\+ 1 recurring item/.test(confirmLabel));
+
+await banner.getByRole('button', { name: /^Add 3/ }).click();
 await page.locator('.import-card').waitFor({ state: 'detached', timeout: 5000 });
 
-check('success notice appears', await page.getByText('Imported 2 transactions').isVisible());
+check('success notice appears', await page.getByText(/Imported 3 transactions/).isVisible());
+check(
+  'success notice mentions the recurring item',
+  await page.getByText(/set up 1 recurring item/).isVisible(),
+);
+check(
+  'recurring list shows the marked bill',
+  await page
+    .locator('.recurring-list li', { hasText: 'NETFLIX.COM' })
+    .locator('.tx-meta', { hasText: 'Every month' })
+    .isVisible(),
+);
+check(
+  'projection card is visible with stats',
+  await page.locator('.projection-card .projection-stats').isVisible(),
+);
 check(
   'imported transaction is in the list',
   await page.getByText('STARBUCKS STORE 123, SEATTLE').isVisible(),
+);
+check(
+  'date lookup produces a projected number',
+  /\$/.test(await page.locator('.lookup-result strong, .lookup-breakdown').first().innerText()),
 );
 check(
   'summary cards include imported spending',
