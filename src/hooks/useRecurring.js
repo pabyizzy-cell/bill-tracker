@@ -88,6 +88,7 @@ export function useRecurring(session, context) {
       if (fields.amountCents !== undefined) patch.amount_cents = fields.amountCents;
       if (fields.frequency !== undefined) patch.frequency = fields.frequency;
       if (fields.anchorDate !== undefined) patch.anchor_date = fields.anchorDate;
+      if (fields.category !== undefined) patch.category = fields.category;
       const { data, error: err } = await supabase
         .from('recurring_items')
         .update(patch)

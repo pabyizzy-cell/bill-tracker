@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getCategory } from '../data/categories.js';
+import { categoriesFor, getCategory } from '../data/categories.js';
 import { useLocalStorage } from '../hooks/useLocalStorage.js';
 import { addDaysISO, formatDate, todayISO } from '../lib/dates.js';
 import { formatCents, parseAmountToCents } from '../lib/money.js';
@@ -55,6 +55,7 @@ export default function RecurringList({
       amount: (item.amountCents / 100).toFixed(2),
       frequency: item.frequency,
       anchorDate: item.anchorDate,
+      category: item.category,
     });
     setError('');
   }
@@ -73,6 +74,7 @@ export default function RecurringList({
       amountCents,
       frequency: draft.frequency,
       anchorDate: draft.anchorDate,
+      category: draft.category,
     });
     if (ok) {
       setEditingId(null);
@@ -236,6 +238,17 @@ export default function RecurringList({
                         {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={draft.category}
+                        onChange={(e) => setDraft({ ...draft, category: e.target.value })}
+                        aria-label="Category"
+                      >
+                        {categoriesFor(item.type).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.emoji} {c.label}
                           </option>
                         ))}
                       </select>

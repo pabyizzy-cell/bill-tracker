@@ -144,6 +144,23 @@ check(
   'the existing recurring item took the new frequency',
   await netflixRows.locator('.tx-meta', { hasText: 'Every week' }).isVisible(),
 );
+// Changing a schedule's category cascades to its matching transactions.
+await page.locator('.recurring-list').getByRole('button', { name: 'Edit NETFLIX.COM' }).click();
+await page.locator('.recurring-edit select[aria-label="Category"]').selectOption('subscriptions');
+await page.locator('.recurring-list').getByRole('button', { name: 'Save' }).click();
+await page.waitForTimeout(300);
+check(
+  'recurring category edit reports the cascade',
+  await page.getByText(/re-categorized 1 matching transaction to Subscriptions/).isVisible(),
+);
+check(
+  'the matching transaction took the new category',
+  await page
+    .locator('.tx-list li', { hasText: 'NETFLIX.COM' })
+    .locator('.tx-meta', { hasText: 'Subscriptions' })
+    .isVisible(),
+);
+
 check(
   'summary cards include imported spending',
   (await page.locator('.summary-value').first().innerText()) !== undefined,

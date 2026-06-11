@@ -364,6 +364,33 @@ export default function App() {
     return added > 0 || updated > 0;
   }
 
+  // Editing a recurring item's category also re-categorizes its matching
+  // transactions (same description) — the charts read categories from
+  // history, so fixing only the schedule would leave them unchanged.
+  async function updateRecurringItem(id, fields) {
+    const item = recurring.items.find((r) => r.id === id);
+    const ok = await recurring.update(id, fields);
+    if (!ok) return false;
+    if (item && fields.category && fields.category !== item.category) {
+      const desc = item.description.trim().toLowerCase();
+      const matchIds = transactions
+        .filter(
+          (t) =>
+            t.description.trim().toLowerCase() === desc && t.category !== fields.category,
+        )
+        .map((t) => t.id);
+      if (matchIds.length > 0) {
+        const okTx = await store.updateMany(matchIds, { category: fields.category });
+        if (okTx) {
+          setImportNotice(
+            `Updated “${item.description}” — also re-categorized ${matchIds.length} matching transaction${matchIds.length === 1 ? '' : 's'} to ${getCategory(fields.category).label}, so the charts follow.`,
+          );
+        }
+      }
+    }
+    return true;
+  }
+
   async function loadSampleData() {
     if (transactions.length > 0 && !window.confirm('Replace your current data with sample data?')) {
       return;
@@ -767,7 +794,7 @@ export default function App() {
         items={recurring.items}
         available={!store.cloudMode || recurring.available}
         canWrite={!readOnly}
-        onUpdate={recurring.update}
+        onUpdate={updateRecurringItem}
         onRemove={recurring.remove}
         onBulkRemove={recurring.removeMany}
         revealSignal={recurringReveal}
